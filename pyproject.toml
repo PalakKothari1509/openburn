@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "openburn"
+version = "0.1.0"
+description = "Open-source aviation fuel burn estimation — a data-driven alternative to BADA/PyContrails"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+authors = [
+    {name = "MRVHub"},
+]
+keywords = ["aviation", "fuel-burn", "emissions", "adsb", "contrails"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+]
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "scikit-learn>=1.3",
+    "flask>=3.0",
+    "flask-cors>=4.0",
+    "gunicorn>=21.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+]
+notebooks = [
+    "jupyter",
+    "matplotlib",
+    "seaborn",
+]
+
+[project.urls]
+Homepage = "https://github.com/mrvhub/openburn"
+Issues = "https://github.com/mrvhub/openburn/issues"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

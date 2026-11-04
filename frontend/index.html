@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenBurn — Aviation Fuel Burn Estimation</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>OpenBurn</h1>
+      <p class="subtitle">Open-source aviation fuel burn estimation</p>
+      <div id="model-status" class="status-badge status-untrained">Model not trained</div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="estimate">Estimate</button>
+      <button class="tab" data-tab="batch">Batch</button>
+      <button class="tab" data-tab="train">Train Model</button>
+      <button class="tab" data-tab="families">Aircraft Families</button>
+    </nav>
+
+    <!-- Single flight estimate -->
+    <section class="card" id="tab-estimate">
+      <h2>Fuel Burn Estimate</h2>
+      <form id="form-estimate">
+        <label>Aircraft Type (ICAO code)
+          <input type="text" name="aircraft_type" placeholder="e.g. B738, A320, B789" required />
+        </label>
+        <label>Distance (km)
+          <input type="number" name="distance_km" placeholder="e.g. 1500" min="1" step="1" required />
+        </label>
+        <label>Flight Duration (minutes) <span class="optional">optional</span>
+          <input type="number" name="flight_duration_min" placeholder="e.g. 180" min="1" step="1" />
+        </label>
+        <label>Cruise Altitude (ft) <span class="optional">optional</span>
+          <input type="number" name="cruise_altitude_ft" placeholder="e.g. 35000" min="1000" step="100" />
+        </label>
+        <label>Average Speed (kts) <span class="optional">optional</span>
+          <input type="number" name="average_speed_kts" placeholder="e.g. 450" min="50" step="1" />
+        </label>
+        <button type="submit">Estimate Fuel Burn</button>
+      </form>
+      <div class="result" id="result-estimate" hidden>
+        <div class="result-grid">
+          <div class="result-item primary">
+            <span class="label">Fuel Burn</span>
+            <span class="value" id="est-fuel">-</span>
+            <span class="unit">kg</span>
+          </div>
+          <div class="result-item">
+            <span class="label">CO₂ Emissions</span>
+            <span class="value" id="est-co2">-</span>
+            <span class="unit">kg</span>
+          </div>
+          <div class="result-item">
+            <span class="label">Method</span>
+            <span class="value" id="est-method">-</span>
+          </div>
+          <div class="result-item">
+            <span class="label">Confidence</span>
+            <span class="value" id="est-confidence">-</span>
+          </div>
+          <div class="result-item">
+            <span class="label">Model RMSE</span>
+            <span class="value" id="est-rmse">-</span>
+            <span class="unit">kg</span>
+          </div>
+        </div>
+        <details class="emissions-detail">
+          <summary>Full emissions breakdown</summary>
+          <div id="emissions-breakdown"></div>
+        </details>
+      </div>
+    </section>
+
+    <!-- Batch estimate -->
+    <section class="card hidden" id="tab-batch">
+      <h2>Batch Estimate</h2>
+      <p>Paste JSON array of flights or upload CSV.</p>
+      <form id="form-batch">
+        <label>Flights (JSON)
+          <textarea name="flights" rows="8" placeholder='[{"aircraft_type":"B738","distance_km":1500},{"aircraft_type":"A320","distance_km":800}]'></textarea>
+        </label>
+        <button type="submit">Estimate Batch</button>
+      </form>
+      <div id="result-batch" hidden>
+        <table id="batch-table">
+          <thead><tr></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Train model -->
+    <section class="card hidden" id="tab-train">
+      <h2>Train Model</h2>
+      <p>Provide the path to your fuel burn CSV data on the server.</p>
+      <form id="form-train">
+        <label>CSV File Path
+          <input type="text" name="csv_path" placeholder="e.g. /data/fuel_data.csv or C:\data\fuel.csv" required />
+        </label>
+        <button type="submit">Train Model</button>
+      </form>
+      <div class="result" id="result-train" hidden>
+        <pre id="train-output"></pre>
+      </div>
+    </section>
+
+    <!-- Aircraft families -->
+    <section class="card hidden" id="tab-families">
+      <h2>Trained Aircraft Families</h2>
+      <button id="btn-load-families">Load Families</button>
+      <div id="result-families" hidden>
+        <table id="families-table">
+          <thead>
+            <tr>
+              <th>Family</th>
+              <th>RMSE (kg)</th>
+              <th>Training Flights</th>
+              <th>Top Feature</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="error-box hidden" id="error-box"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
