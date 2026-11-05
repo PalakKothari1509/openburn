@@ -11,7 +11,7 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.model_selection import cross_val_score
 
 
@@ -19,7 +19,7 @@ from sklearn.model_selection import cross_val_score
 class PerformanceProfile:
     """Learned performance profile for an aircraft family."""
     aircraft_family: str
-    model: GradientBoostingRegressor
+    model: HistGradientBoostingRegressor
     feature_names: list[str]
     rmse_cv: float  # Cross-validated RMSE (kg)
     n_training_flights: int
@@ -72,11 +72,10 @@ class PerformanceModel:
             if len(X) < 10:
                 continue
 
-            model = GradientBoostingRegressor(
-                n_estimators=200,
+            model = HistGradientBoostingRegressor(
+                max_iter=200,
                 max_depth=5,
                 learning_rate=0.1,
-                subsample=0.8,
                 random_state=42,
             )
 
@@ -118,7 +117,13 @@ class PerformanceModel:
         if profile is None:
             return None
 
-        X = pd.DataFrame([features])[profile.feature_names]
+        # Only use features that are both available and expected by the model
+        available_features = [f for f in profile.feature_names if f in features]
+        if not available_features:
+            return None
+
+        row = {f: features.get(f, np.nan) for f in profile.feature_names}
+        X = pd.DataFrame([row])[profile.feature_names]
         prediction = profile.model.predict(X)[0]
 
         return {
@@ -140,8 +145,12 @@ class PerformanceModel:
         profile = self._profiles.get(aircraft_family)
         if profile is None:
             return None
-        importances = profile.model.feature_importances_
-        return dict(zip(profile.feature_names, [round(v, 4) for v in importances]))
+        if hasattr(profile.model, "feature_importances_"):
+            importances = profile.model.feature_importances_
+            return dict(zip(profile.feature_names, [round(v, 4) for v in importances]))
+        # HistGradientBoosting doesn't expose feature_importances_ directly;
+        # return feature list with note
+        return {f: None for f in profile.feature_names}
 
 
 def _select_feature_cols(df: pd.DataFrame) -> list[str]:
@@ -149,6 +158,8 @@ def _select_feature_cols(df: pd.DataFrame) -> list[str]:
     potential_features = [
         "distance_km",
         "flight_duration_min",
+        "airborne_duration_min",
+        "taxi_time_min",
         "cruise_altitude_ft",
         "average_speed_kts",
         "payload_kg",

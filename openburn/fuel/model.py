@@ -9,8 +9,11 @@ from typing import Optional
 import pandas as pd
 
 from openburn.aircraft.performance import PerformanceModel
-from openburn.fuel.features import FeatureExtractor
+from openburn.fuel.features import FeatureExtractor, load_airport_coords
 from openburn.fuel.fallback import FallbackEstimator
+
+# Default airport coords file (relative to package)
+_DEFAULT_AIRPORT_COORDS = Path(__file__).resolve().parent.parent.parent / "data" / "airport_coords.csv"
 
 
 class FuelBurnModel:
@@ -20,11 +23,16 @@ class FuelBurnModel:
     feature extraction, and fallback estimation into a single API.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, airport_coords_path: str | Path | None = None) -> None:
         self.performance = PerformanceModel()
         self.features = FeatureExtractor()
         self.fallback = FallbackEstimator()
         self._is_trained = False
+
+        # Load airport coordinates for distance calculation
+        coords_path = Path(airport_coords_path) if airport_coords_path else _DEFAULT_AIRPORT_COORDS
+        if coords_path.exists():
+            load_airport_coords(str(coords_path))
 
     def train_from_csv(self, fuel_csv_path: str, **kwargs) -> dict:
         """Train the model from a CSV of historical fuel burn data.
