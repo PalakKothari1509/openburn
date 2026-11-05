@@ -36,9 +36,10 @@ def train():
     if not csv_path:
         return jsonify({"error": "csv_path is required"}), 400
 
+    test_size = float(data.get("test_size", 0.2))
     try:
-        result = model.train_from_csv(csv_path)
-        return jsonify({"status": "trained", **result})
+        result = model.train_from_csv(csv_path, test_size=test_size)
+        return jsonify({"status": "trained", **_clean_numpy(result)})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
@@ -145,6 +146,20 @@ def list_families():
                 "feature_importance": model.performance.feature_importance(fam),
             }
     return jsonify(families)
+
+
+def _clean_numpy(obj):
+    """Convert numpy types to native Python for JSON serialization."""
+    import numpy as np
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, dict):
+        return {k: _clean_numpy(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_clean_numpy(v) for v in obj]
+    return obj
 
 
 def _float_or_none(val):

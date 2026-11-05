@@ -149,7 +149,10 @@ class FeatureExtractor:
 
         # Remove extreme outliers (> 3 std from mean per aircraft family)
         if "aircraft_family" in df.columns:
-            df = df.groupby("aircraft_family", group_keys=False).apply(_remove_outliers)
+            keep = []
+            for _, group in df.groupby("aircraft_family"):
+                keep.append(_remove_outliers(group))
+            df = pd.concat(keep, ignore_index=True) if keep else df
         else:
             df = _remove_outliers(df)
 

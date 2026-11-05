@@ -6,7 +6,9 @@ import json
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 from openburn.aircraft.performance import PerformanceModel
 from openburn.fuel.features import FeatureExtractor, load_airport_coords
@@ -28,44 +30,100 @@ class FuelBurnModel:
         self.features = FeatureExtractor()
         self.fallback = FallbackEstimator()
         self._is_trained = False
+        self._training_summary: dict = {}
 
         # Load airport coordinates for distance calculation
         coords_path = Path(airport_coords_path) if airport_coords_path else _DEFAULT_AIRPORT_COORDS
         if coords_path.exists():
             load_airport_coords(str(coords_path))
 
-    def train_from_csv(self, fuel_csv_path: str, **kwargs) -> dict:
+    def train_from_csv(
+        self,
+        fuel_csv_path: str,
+        test_size: float = 0.2,
+        random_state: int = 42,
+        **kwargs,
+    ) -> dict:
         """Train the model from a CSV of historical fuel burn data.
 
         Args:
             fuel_csv_path: Path to CSV with flight records and fuel burn.
+            test_size: Fraction of data to hold out for validation (0-1).
+                Set to 0 to train on all data (no validation).
+            random_state: Random seed for reproducibility.
 
         Returns:
-            Training summary with per-family metrics.
+            Training summary with per-family metrics and validation results.
         """
         df = self.features.load_fuel_csv(fuel_csv_path, **kwargs)
         df = self.features.prepare_training_data(df)
 
+        validation_results = None
+        if test_size > 0 and len(df) > 50:
+            train_df, test_df = train_test_split(
+                df, test_size=test_size, random_state=random_state,
+                stratify=df["aircraft_family"] if "aircraft_family" in df.columns else None,
+            )
+        else:
+            train_df = df
+            test_df = None
+
         # Train per-family performance models
-        profiles = self.performance.train(df)
+        profiles = self.performance.train(train_df)
 
         # Build fallback estimator from the same data
-        self.fallback.fit(df)
+        self.fallback.fit(train_df)
 
         self._is_trained = True
 
-        return {
+        summary = {
             "families_trained": list(profiles.keys()),
-            "total_flights_used": len(df),
+            "total_flights": len(df),
+            "training_flights": len(train_df),
+            "test_flights": len(test_df) if test_df is not None else 0,
             "per_family": {
                 name: {
-                    "rmse_kg": p.rmse_cv,
-                    "n_flights": p.n_training_flights,
+                    "rmse_cv_kg": p.rmse_cv,
+                    "n_training_flights": p.n_training_flights,
                 }
                 for name, p in profiles.items()
             },
-            "data_summary": self.features.summary(df),
+            "data_summary": self.features.summary(train_df),
         }
+
+        # Run holdout validation
+        if test_df is not None and len(test_df) > 0:
+            from openburn.validation.compare import ValidationReport
+            estimated = self.batch_estimate(test_df)
+            vr = ValidationReport()
+            try:
+                overall = vr.validate(estimated)
+                by_family = vr.validate_by_family(estimated)
+                summary["holdout_validation"] = {
+                    "overall": {
+                        "mae_kg": overall.mae_kg,
+                        "rmse_kg": overall.rmse_kg,
+                        "mape_pct": overall.mape_pct,
+                        "r_squared": overall.r_squared,
+                        "bias_kg": overall.bias_kg,
+                        "n_flights": overall.n_flights,
+                    },
+                    "per_family": {
+                        fam: {
+                            "mae_kg": m.mae_kg,
+                            "rmse_kg": m.rmse_kg,
+                            "mape_pct": m.mape_pct,
+                            "r_squared": m.r_squared,
+                            "n_flights": m.n_flights,
+                        }
+                        for fam, m in by_family.items()
+                    },
+                }
+            except ValueError:
+                pass
+
+        self._training_summary = summary
+        return summary
 
     def estimate(
         self,
@@ -121,27 +179,48 @@ class FuelBurnModel:
     def batch_estimate(self, df: pd.DataFrame) -> pd.DataFrame:
         """Estimate fuel burn for a batch of flights.
 
-        Args:
-            df: DataFrame with at least 'aircraft_family' and 'distance_km' columns.
-
-        Returns:
-            Input dataframe with added fuel_burn_estimated_kg and estimation_method columns.
+        Uses vectorized prediction per aircraft family for speed.
         """
-        results = []
-        for _, row in df.iterrows():
-            features = {
-                k: row[k] for k in row.index
-                if k not in ("aircraft_family", "fuel_burn_kg") and pd.notna(row[k])
-            }
-            ac_type = row.get("aircraft_family", row.get("aircraft_type", "UNKNOWN"))
-            est = self.estimate(aircraft_type=str(ac_type), **features)
-            results.append(est)
+        if not self._is_trained:
+            raise RuntimeError("Model not trained. Call train_from_csv() first.")
 
-        result_df = pd.DataFrame(results)
         df = df.copy()
-        df["fuel_burn_estimated_kg"] = result_df["fuel_burn_kg"].values
-        df["estimation_method"] = result_df["method"].values
-        df["estimation_confidence"] = result_df["confidence"].values
+        df["fuel_burn_estimated_kg"] = np.nan
+        df["estimation_method"] = ""
+        df["estimation_confidence"] = ""
+
+        family_col = "aircraft_family" if "aircraft_family" in df.columns else "aircraft_type"
+
+        for family in df[family_col].unique():
+            mask = df[family_col] == family
+            family_df = df.loc[mask]
+            profile = self.performance.get_profile(str(family))
+
+            if profile is not None:
+                # Vectorized prediction for this family
+                feature_data = {}
+                for feat in profile.feature_names:
+                    if feat in family_df.columns:
+                        feature_data[feat] = family_df[feat].values
+                    else:
+                        feature_data[feat] = np.full(len(family_df), np.nan)
+
+                X = pd.DataFrame(feature_data)[profile.feature_names]
+                predictions = profile.model.predict(X)
+                predictions = np.maximum(0, predictions)
+
+                df.loc[mask, "fuel_burn_estimated_kg"] = np.round(predictions, 2)
+                df.loc[mask, "estimation_method"] = "trained_model"
+                df.loc[mask, "estimation_confidence"] = "high"
+            else:
+                # Fallback for unknown families
+                for idx in family_df.index:
+                    dist = family_df.loc[idx, "distance_km"] if "distance_km" in family_df.columns else 0
+                    fb = self.fallback.estimate(str(family), float(dist))
+                    df.loc[idx, "fuel_burn_estimated_kg"] = fb["fuel_burn_kg"]
+                    df.loc[idx, "estimation_method"] = "fallback"
+                    df.loc[idx, "estimation_confidence"] = "low"
+
         return df
 
     def save_summary(self, path: str) -> None:
@@ -158,4 +237,6 @@ class FuelBurnModel:
                     "n_training_flights": profile.n_training_flights,
                     "features": profile.feature_names,
                 }
+        if self._training_summary.get("holdout_validation"):
+            summary["holdout_validation"] = self._training_summary["holdout_validation"]
         Path(path).write_text(json.dumps(summary, indent=2))
