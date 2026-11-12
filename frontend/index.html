@@ -15,18 +15,93 @@
     </header>
 
     <nav class="tabs">
-      <button class="tab active" data-tab="estimate">Estimate</button>
+      <button class="tab active" data-tab="route">Route Estimate</button>
+      <button class="tab" data-tab="estimate">Advanced</button>
       <button class="tab" data-tab="batch">Batch</button>
       <button class="tab" data-tab="train">Train Model</button>
-      <button class="tab" data-tab="families">Aircraft Families</button>
+      <button class="tab" data-tab="families">Families</button>
     </nav>
 
-    <!-- Single flight estimate -->
-    <section class="card" id="tab-estimate">
-      <h2>Fuel Burn Estimate</h2>
+    <!-- Route-based estimate (primary) -->
+    <section class="card" id="tab-route">
+      <h2>Fuel Burn by Route</h2>
+      <p>Enter departure, arrival, and aircraft type to estimate fuel burn.</p>
+      <form id="form-route">
+        <div class="form-row">
+          <label>Departure Airport
+            <input type="text" name="departure" placeholder="e.g. MAD, LHR, JFK" maxlength="4" required />
+          </label>
+          <label>Arrival Airport
+            <input type="text" name="arrival" placeholder="e.g. LHR, KEF, BCN" maxlength="4" required />
+          </label>
+        </div>
+        <div class="form-row">
+          <label>Aircraft Type
+            <select name="aircraft_type" id="aircraft-select" required>
+              <option value="">Select aircraft...</option>
+              <option value="A319">A319 — Airbus A319</option>
+              <option value="A320">A320 — Airbus A320</option>
+              <option value="A20N">A20N — Airbus A320neo</option>
+              <option value="A21N">A21N — Airbus A321neo</option>
+              <option value="A332">A332 — Airbus A330-200</option>
+              <option value="A339">A339 — Airbus A330-900neo</option>
+              <option value="E190">E190 — Embraer E190</option>
+              <option value="E195">E195 — Embraer E195</option>
+            </select>
+          </label>
+          <label>Passengers <span class="optional">optional</span>
+            <input type="number" name="passengers" placeholder="e.g. 150" min="0" max="600" step="1" />
+          </label>
+        </div>
+        <button type="submit">Calculate Fuel Burn</button>
+      </form>
+      <div class="result" id="result-route" hidden>
+        <div class="route-header" id="route-header"></div>
+        <div class="result-grid">
+          <div class="result-item primary">
+            <span class="label">Fuel Burn</span>
+            <span class="value" id="route-fuel">-</span>
+            <span class="unit">kg</span>
+          </div>
+          <div class="result-item">
+            <span class="label">CO&#8322; Emissions</span>
+            <span class="value" id="route-co2">-</span>
+            <span class="unit">kg</span>
+          </div>
+          <div class="result-item">
+            <span class="label">Distance</span>
+            <span class="value" id="route-distance">-</span>
+            <span class="unit">km</span>
+          </div>
+          <div class="result-item">
+            <span class="label">Est. Duration</span>
+            <span class="value" id="route-duration">-</span>
+            <span class="unit">min</span>
+          </div>
+          <div class="result-item">
+            <span class="label">Confidence</span>
+            <span class="value" id="route-confidence">-</span>
+          </div>
+          <div class="result-item">
+            <span class="label">Model RMSE</span>
+            <span class="value" id="route-rmse">-</span>
+            <span class="unit">kg</span>
+          </div>
+        </div>
+        <details class="emissions-detail">
+          <summary>Full emissions breakdown</summary>
+          <div id="route-emissions-breakdown"></div>
+        </details>
+      </div>
+    </section>
+
+    <!-- Advanced estimate (manual distance/duration) -->
+    <section class="card hidden" id="tab-estimate">
+      <h2>Advanced Estimate</h2>
+      <p>Manually enter distance and optional parameters.</p>
       <form id="form-estimate">
         <label>Aircraft Type (ICAO code)
-          <input type="text" name="aircraft_type" placeholder="e.g. B738, A320, B789" required />
+          <input type="text" name="aircraft_type" placeholder="e.g. A320, A339, E190" required />
         </label>
         <label>Distance (km)
           <input type="number" name="distance_km" placeholder="e.g. 1500" min="1" step="1" required />
@@ -36,9 +111,6 @@
         </label>
         <label>Cruise Altitude (ft) <span class="optional">optional</span>
           <input type="number" name="cruise_altitude_ft" placeholder="e.g. 35000" min="1000" step="100" />
-        </label>
-        <label>Average Speed (kts) <span class="optional">optional</span>
-          <input type="number" name="average_speed_kts" placeholder="e.g. 450" min="50" step="1" />
         </label>
         <button type="submit">Estimate Fuel Burn</button>
       </form>
@@ -50,7 +122,7 @@
             <span class="unit">kg</span>
           </div>
           <div class="result-item">
-            <span class="label">CO₂ Emissions</span>
+            <span class="label">CO&#8322; Emissions</span>
             <span class="value" id="est-co2">-</span>
             <span class="unit">kg</span>
           </div>
@@ -61,11 +133,6 @@
           <div class="result-item">
             <span class="label">Confidence</span>
             <span class="value" id="est-confidence">-</span>
-          </div>
-          <div class="result-item">
-            <span class="label">Model RMSE</span>
-            <span class="value" id="est-rmse">-</span>
-            <span class="unit">kg</span>
           </div>
         </div>
         <details class="emissions-detail">
@@ -78,10 +145,10 @@
     <!-- Batch estimate -->
     <section class="card hidden" id="tab-batch">
       <h2>Batch Estimate</h2>
-      <p>Paste JSON array of flights or upload CSV.</p>
+      <p>Paste JSON array of flights.</p>
       <form id="form-batch">
         <label>Flights (JSON)
-          <textarea name="flights" rows="8" placeholder='[{"aircraft_type":"B738","distance_km":1500},{"aircraft_type":"A320","distance_km":800}]'></textarea>
+          <textarea name="flights" rows="8" placeholder='[{"aircraft_type":"A320","distance_km":1500},{"aircraft_type":"E190","distance_km":800}]'></textarea>
         </label>
         <button type="submit">Estimate Batch</button>
       </form>
@@ -96,10 +163,10 @@
     <!-- Train model -->
     <section class="card hidden" id="tab-train">
       <h2>Train Model</h2>
-      <p>Provide the path to your fuel burn CSV data on the server.</p>
+      <p>Provide the server path to your fuel burn CSV data.</p>
       <form id="form-train">
         <label>CSV File Path
-          <input type="text" name="csv_path" placeholder="e.g. /data/fuel_data.csv or C:\data\fuel.csv" required />
+          <input type="text" name="csv_path" placeholder="e.g. flights_XXX_Air_01_01_2025_to_31_01_2025.csv" required />
         </label>
         <button type="submit">Train Model</button>
       </form>
@@ -119,7 +186,6 @@
               <th>Family</th>
               <th>RMSE (kg)</th>
               <th>Training Flights</th>
-              <th>Top Feature</th>
             </tr>
           </thead>
           <tbody></tbody>

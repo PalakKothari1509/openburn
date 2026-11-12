@@ -31,46 +31,98 @@ async function api(endpoint, options = {}) {
   return data;
 }
 
+function formatNum(n) {
+  return typeof n === "number" ? n.toLocaleString() : n;
+}
+
 // Check model status on load
 async function checkStatus() {
   try {
     const data = await api("/health");
     const badge = document.getElementById("model-status");
     if (data.model_trained) {
-      badge.textContent = `Model trained (${data.families_available.length} families)`;
+      badge.textContent = `Model trained (${data.families_available.length} families: ${data.families_available.join(", ")})`;
       badge.className = "status-badge status-trained";
     } else {
-      badge.textContent = "Model not trained";
+      badge.textContent = "Model not trained — go to Train Model tab";
       badge.className = "status-badge status-untrained";
     }
   } catch {
-    document.getElementById("model-status").textContent = "API offline";
+    document.getElementById("model-status").textContent = "API offline — start the server with: python api/app.py";
+    document.getElementById("model-status").className = "status-badge status-untrained";
   }
 }
 checkStatus();
 
-// Single estimate
+// ============================================================
+// Route-based estimate (primary)
+// ============================================================
+document.getElementById("form-route").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  hideError();
+  const fd = new FormData(e.target);
+  const body = {
+    departure: fd.get("departure").toUpperCase().trim(),
+    arrival: fd.get("arrival").toUpperCase().trim(),
+    aircraft_type: fd.get("aircraft_type"),
+  };
+  if (fd.get("passengers")) body.passengers = fd.get("passengers");
+
+  try {
+    const data = await api("/estimate/route", { method: "POST", body: JSON.stringify(body) });
+
+    // Route header
+    document.getElementById("route-header").innerHTML =
+      `<span class="route-label">${data.route.departure}</span>` +
+      `<span class="route-arrow">→</span>` +
+      `<span class="route-label">${data.route.arrival}</span>` +
+      `<span class="route-aircraft">${data.aircraft_family}</span>`;
+
+    document.getElementById("route-fuel").textContent = formatNum(data.fuel_burn_kg);
+    document.getElementById("route-co2").textContent = formatNum(data.emissions.co2);
+    document.getElementById("route-distance").textContent = formatNum(data.route.distance_km);
+    document.getElementById("route-duration").textContent = formatNum(Math.round(data.route.estimated_duration_min));
+    document.getElementById("route-confidence").textContent = data.confidence;
+    document.getElementById("route-rmse").textContent = data.model_rmse_kg || "N/A";
+
+    // Emissions breakdown
+    const breakdown = document.getElementById("route-emissions-breakdown");
+    breakdown.innerHTML = Object.entries(data.emissions)
+      .map(([k, v]) => `<div class="emission-row"><span>${k.toUpperCase()}</span><span>${formatNum(v)} kg</span></div>`)
+      .join("");
+
+    document.getElementById("result-route").hidden = false;
+  } catch (err) {
+    showError(err.message);
+  }
+});
+
+// Auto-uppercase airport inputs
+document.querySelectorAll('input[name="departure"], input[name="arrival"]').forEach((input) => {
+  input.addEventListener("input", () => { input.value = input.value.toUpperCase(); });
+});
+
+// ============================================================
+// Advanced estimate
+// ============================================================
 document.getElementById("form-estimate").addEventListener("submit", async (e) => {
   e.preventDefault();
   hideError();
   const fd = new FormData(e.target);
-  const body = { aircraft_type: fd.get("aircraft_type"), distance_km: fd.get("distance_km") };
+  const body = { aircraft_type: fd.get("aircraft_type").toUpperCase().trim(), distance_km: fd.get("distance_km") };
   if (fd.get("flight_duration_min")) body.flight_duration_min = fd.get("flight_duration_min");
   if (fd.get("cruise_altitude_ft")) body.cruise_altitude_ft = fd.get("cruise_altitude_ft");
-  if (fd.get("average_speed_kts")) body.average_speed_kts = fd.get("average_speed_kts");
 
   try {
     const data = await api("/estimate", { method: "POST", body: JSON.stringify(body) });
-    document.getElementById("est-fuel").textContent = data.fuel_burn_kg.toLocaleString();
-    document.getElementById("est-co2").textContent = data.emissions.co2.toLocaleString();
+    document.getElementById("est-fuel").textContent = formatNum(data.fuel_burn_kg);
+    document.getElementById("est-co2").textContent = formatNum(data.emissions.co2);
     document.getElementById("est-method").textContent = data.method;
     document.getElementById("est-confidence").textContent = data.confidence;
-    document.getElementById("est-rmse").textContent = data.model_rmse_kg || "N/A";
 
-    // Emissions breakdown
     const breakdown = document.getElementById("emissions-breakdown");
     breakdown.innerHTML = Object.entries(data.emissions)
-      .map(([k, v]) => `<div class="emission-row"><span>${k.toUpperCase()}</span><span>${v.toLocaleString()} kg</span></div>`)
+      .map(([k, v]) => `<div class="emission-row"><span>${k.toUpperCase()}</span><span>${formatNum(v)} kg</span></div>`)
       .join("");
 
     document.getElementById("result-estimate").hidden = false;
@@ -79,7 +131,9 @@ document.getElementById("form-estimate").addEventListener("submit", async (e) =>
   }
 });
 
+// ============================================================
 // Batch estimate
+// ============================================================
 document.getElementById("form-batch").addEventListener("submit", async (e) => {
   e.preventDefault();
   hideError();
@@ -99,7 +153,7 @@ document.getElementById("form-batch").addEventListener("submit", async (e) => {
 
     thead.innerHTML = available.map((c) => `<th>${c}</th>`).join("");
     tbody.innerHTML = data
-      .map((row) => `<tr>${available.map((c) => `<td>${row[c] ?? ""}</td>`).join("")}</tr>`)
+      .map((row) => `<tr>${available.map((c) => `<td>${formatNum(row[c]) ?? ""}</td>`).join("")}</tr>`)
       .join("");
 
     document.getElementById("result-batch").hidden = false;
@@ -108,11 +162,16 @@ document.getElementById("form-batch").addEventListener("submit", async (e) => {
   }
 });
 
+// ============================================================
 // Train model
+// ============================================================
 document.getElementById("form-train").addEventListener("submit", async (e) => {
   e.preventDefault();
   hideError();
   const fd = new FormData(e.target);
+  const btn = e.target.querySelector("button");
+  btn.textContent = "Training...";
+  btn.disabled = true;
   try {
     const data = await api("/train", {
       method: "POST",
@@ -123,22 +182,24 @@ document.getElementById("form-train").addEventListener("submit", async (e) => {
     checkStatus();
   } catch (err) {
     showError(err.message);
+  } finally {
+    btn.textContent = "Train Model";
+    btn.disabled = false;
   }
 });
 
+// ============================================================
 // Load families
+// ============================================================
 document.getElementById("btn-load-families").addEventListener("click", async () => {
   hideError();
   try {
     const data = await api("/families");
     const tbody = document.getElementById("families-table").querySelector("tbody");
     tbody.innerHTML = Object.entries(data)
-      .map(([fam, info]) => {
-        const topFeature = info.feature_importance
-          ? Object.entries(info.feature_importance).sort((a, b) => b[1] - a[1])[0]?.[0] || "-"
-          : "-";
-        return `<tr><td>${fam}</td><td>${info.rmse_kg}</td><td>${info.n_training_flights}</td><td>${topFeature}</td></tr>`;
-      })
+      .map(([fam, info]) =>
+        `<tr><td>${fam}</td><td>${formatNum(info.rmse_kg)}</td><td>${formatNum(info.n_training_flights)}</td></tr>`
+      )
       .join("");
     document.getElementById("result-families").hidden = false;
   } catch (err) {

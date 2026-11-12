@@ -109,6 +109,46 @@ def estimate_batch():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/estimate/route", methods=["POST"])
+def estimate_route():
+    """Estimate fuel burn from departure, arrival, and aircraft type.
+
+    POST body: {
+        "departure": "MAD",
+        "arrival": "LHR",
+        "aircraft_type": "A320",
+        "passengers": 150           // optional
+    }
+    """
+    data = request.get_json()
+
+    required = ["departure", "arrival", "aircraft_type"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+
+    try:
+        result = model.estimate_route(
+            departure=data["departure"],
+            arrival=data["arrival"],
+            aircraft_type=data["aircraft_type"],
+            passengers=int(data["passengers"]) if data.get("passengers") else None,
+        )
+        return jsonify(_clean_numpy(result))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/airports", methods=["GET"])
+def list_airports():
+    """List all known airport codes."""
+    return jsonify({"airports": model.get_airports()})
+
+
 @app.route("/data/summary", methods=["POST"])
 def data_summary():
     """Get summary of a fuel data CSV without training.
