@@ -163,13 +163,23 @@
     <!-- Train model -->
     <section class="card hidden" id="tab-train">
       <h2>Train Model</h2>
-      <p>Provide the server path to your fuel burn CSV data.</p>
-      <form id="form-train">
-        <label>CSV File Path
-          <input type="text" name="csv_path" placeholder="e.g. flights_XXX_Air_01_01_2025_to_31_01_2025.csv" required />
+      <p>Upload a fuel burn CSV file, or provide a server path to one.</p>
+      <form id="form-train-upload">
+        <label>Upload CSV File
+          <input type="file" name="file" accept=".csv" required />
         </label>
-        <button type="submit">Train Model</button>
+        <button type="submit">Upload &amp; Train</button>
       </form>
+
+      <p class="divider">— or —</p>
+
+      <form id="form-train">
+        <label>CSV File Path (on the server)
+          <input type="text" name="csv_path" placeholder="e.g. flights_XXX_Air_01_01_2025_to_31_01_2025.csv" />
+        </label>
+        <button type="submit">Train from Path</button>
+      </form>
+
       <div class="result" id="result-train" hidden>
         <pre id="train-output"></pre>
       </div>

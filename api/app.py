@@ -1,12 +1,19 @@
 """OpenBurn REST API — aviation fuel burn estimation service."""
 
-from flask import Flask, request, jsonify
+import os
+import tempfile
+from werkzeug.utils import secure_filename
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
 from openburn.fuel.model import FuelBurnModel
 from openburn.fuel.features import FeatureExtractor
 from openburn.reporting.emissions import EmissionsReport
 from openburn.validation.compare import ValidationReport
+
+FRONTEND_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend")
+)
 
 app = Flask(__name__)
 CORS(app)
@@ -16,6 +23,26 @@ model = FuelBurnModel()
 emissions = EmissionsReport()
 
 
+# --- Frontend serving ---
+@app.route("/")
+def serve_frontend():
+    with open(os.path.join(FRONTEND_DIR, "index.html"), encoding="utf-8") as f:
+        return f.read(), 200, {"Content-Type": "text/html"}
+
+
+@app.route("/style.css")
+def serve_css():
+    with open(os.path.join(FRONTEND_DIR, "style.css"), encoding="utf-8") as f:
+        return f.read(), 200, {"Content-Type": "text/css"}
+
+
+@app.route("/script.js")
+def serve_js():
+    with open(os.path.join(FRONTEND_DIR, "script.js"), encoding="utf-8") as f:
+        return f.read(), 200, {"Content-Type": "application/javascript"}
+
+
+# --- API endpoints ---
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({
@@ -42,6 +69,38 @@ def train():
         return jsonify({"status": "trained", **_clean_numpy(result)})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+
+@app.route("/train/upload", methods=["POST"])
+def train_upload():
+    """Train model from an uploaded CSV file (browser file picker, not a server path).
+
+    multipart/form-data: "file" (the CSV), optional "test_size" field.
+    """
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+    if not file.filename.lower().endswith(".csv"):
+        return jsonify({"error": "File must be a .csv"}), 400
+
+    test_size = float(request.form.get("test_size", 0.2))
+
+    # Save to a temp path so train_from_csv (which expects a path) can read it,
+    # then clean up regardless of outcome.
+    safe_name = secure_filename(file.filename)
+    fd, tmp_path = tempfile.mkstemp(suffix=f"_{safe_name}")
+    os.close(fd)
+    try:
+        file.save(tmp_path)
+        result = model.train_from_csv(tmp_path, test_size=test_size)
+        return jsonify({"status": "trained", **_clean_numpy(result)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    finally:
+        os.remove(tmp_path)
 
 
 @app.route("/estimate", methods=["POST"])

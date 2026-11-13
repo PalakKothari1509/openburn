@@ -225,6 +225,13 @@ pre {
   overflow-y: auto;
 }
 
+.divider {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 1.25rem 0;
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

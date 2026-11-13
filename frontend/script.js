@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:5000";
+const API_BASE = window.location.origin;
 
 // Tab switching
 document.querySelectorAll(".tab").forEach((btn) => {
@@ -184,6 +184,33 @@ document.getElementById("form-train").addEventListener("submit", async (e) => {
     showError(err.message);
   } finally {
     btn.textContent = "Train Model";
+    btn.disabled = false;
+  }
+});
+
+// ============================================================
+// Train model (upload a CSV file directly)
+// ============================================================
+document.getElementById("form-train-upload").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  hideError();
+  const fd = new FormData(e.target);
+  const btn = e.target.querySelector("button");
+  btn.textContent = "Uploading & Training...";
+  btn.disabled = true;
+  try {
+    // Don't use the api() helper here — it forces a JSON content-type,
+    // which breaks multipart/form-data file uploads. Let fetch set its own.
+    const res = await fetch(`${API_BASE}/train/upload`, { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Unknown error");
+    document.getElementById("train-output").textContent = JSON.stringify(data, null, 2);
+    document.getElementById("result-train").hidden = false;
+    checkStatus();
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    btn.textContent = "Upload & Train";
     btn.disabled = false;
   }
 });

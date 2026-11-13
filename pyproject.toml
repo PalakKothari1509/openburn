@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "openburn"
@@ -45,6 +45,9 @@ notebooks = [
 [project.urls]
 Homepage = "https://github.com/mrvhub/openburn"
 Issues = "https://github.com/mrvhub/openburn/issues"
+
+[tool.setuptools.packages.find]
+include = ["openburn*"]
 
 [tool.ruff]
 line-length = 100
