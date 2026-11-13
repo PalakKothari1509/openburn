@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.model_selection import cross_val_score
+from sklearn.inspection import permutation_importance
 
 
 @dataclass
@@ -23,6 +24,7 @@ class PerformanceProfile:
     feature_names: list[str]
     rmse_cv: float  # Cross-validated RMSE (kg)
     n_training_flights: int
+    feature_importance: dict[str, float]
 
 
 class PerformanceModel:
@@ -88,12 +90,21 @@ class PerformanceModel:
             # Train final model on all data
             model.fit(X, y)
 
+            # HistGradientBoostingRegressor has no feature_importances_ attribute,
+            # so use permutation importance instead (works on any fitted model).
+            perm = permutation_importance(
+                model, X, y, n_repeats=5, random_state=42,
+                scoring="neg_root_mean_squared_error",
+            )
+            importance = dict(zip(feature_cols, [round(float(v), 4) for v in perm.importances_mean]))
+
             profile = PerformanceProfile(
                 aircraft_family=str(family),
                 model=model,
                 feature_names=feature_cols,
                 rmse_cv=round(rmse, 2),
                 n_training_flights=len(X),
+                feature_importance=importance,
             )
             self._profiles[str(family)] = profile
             results[str(family)] = profile
@@ -145,12 +156,15 @@ class PerformanceModel:
         profile = self._profiles.get(aircraft_family)
         if profile is None:
             return None
-        if hasattr(profile.model, "feature_importances_"):
-            importances = profile.model.feature_importances_
-            return dict(zip(profile.feature_names, [round(v, 4) for v in importances]))
-        # HistGradientBoosting doesn't expose feature_importances_ directly;
-        # return feature list with note
-        return {f: None for f in profile.feature_names}
+        return profile.feature_importance
+
+    def get_state(self) -> dict:
+        """Return picklable state for model persistence."""
+        return {"profiles": self._profiles}
+
+    def set_state(self, state: dict) -> None:
+        """Restore state saved by get_state()."""
+        self._profiles = state["profiles"]
 
 
 def _select_feature_cols(df: pd.DataFrame) -> list[str]:

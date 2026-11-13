@@ -14,13 +14,20 @@ from openburn.validation.compare import ValidationReport
 FRONTEND_DIR = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend")
 )
+MODEL_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "trained_model.joblib")
+)
 
 app = Flask(__name__)
 CORS(app)
 
-# Global model instance — trained on startup or via /train endpoint
+# Global model instance — loaded from disk if a saved model exists, otherwise
+# trained via /train or /train/upload
 model = FuelBurnModel()
 emissions = EmissionsReport()
+
+if model.load_model(MODEL_PATH):
+    print(f"Loaded saved model from {MODEL_PATH} — no need to retrain.")
 
 
 # --- Frontend serving ---
@@ -66,6 +73,7 @@ def train():
     test_size = float(data.get("test_size", 0.2))
     try:
         result = model.train_from_csv(csv_path, test_size=test_size)
+        model.save_model(MODEL_PATH)
         return jsonify({"status": "trained", **_clean_numpy(result)})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -96,6 +104,7 @@ def train_upload():
     try:
         file.save(tmp_path)
         result = model.train_from_csv(tmp_path, test_size=test_size)
+        model.save_model(MODEL_PATH)
         return jsonify({"status": "trained", **_clean_numpy(result)})
     except Exception as e:
         return jsonify({"error": str(e)}), 400

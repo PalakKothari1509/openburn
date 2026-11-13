@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -333,6 +334,35 @@ class FuelBurnModel:
         base_min = distance_km / speed
         overhead = 25 + (distance_km / 10000) * 10  # scales with distance
         return base_min + overhead
+
+    def save_model(self, path: str | Path) -> None:
+        """Save the full trained model (profiles, fallback estimator, learned
+        speeds) to disk so the server doesn't need to retrain on restart."""
+        if not self._is_trained:
+            raise RuntimeError("Model not trained — nothing to save.")
+        state = {
+            "performance": self.performance.get_state(),
+            "fallback": self.fallback.get_state(),
+            "avg_speeds": self._avg_speeds,
+            "training_summary": self._training_summary,
+        }
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(state, path)
+
+    def load_model(self, path: str | Path) -> bool:
+        """Load a previously saved model from disk. Returns True if a saved
+        model was found and loaded, False if the path doesn't exist yet."""
+        path = Path(path)
+        if not path.exists():
+            return False
+        state = joblib.load(path)
+        self.performance.set_state(state["performance"])
+        self.fallback.set_state(state["fallback"])
+        self._avg_speeds = state.get("avg_speeds", {})
+        self._training_summary = state.get("training_summary", {})
+        self._is_trained = True
+        return True
 
     def save_summary(self, path: str) -> None:
         """Save model summary to JSON."""

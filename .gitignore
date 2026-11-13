@@ -11,6 +11,7 @@ env/
 .env
 *.csv
 !data/sample_*.csv
+data/trained_model.joblib
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

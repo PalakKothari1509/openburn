@@ -78,6 +78,15 @@ class FallbackEstimator:
                     "n_flights": len(group),
                 }
 
+    def get_state(self) -> dict:
+        """Return picklable state for model persistence."""
+        return {"rates": self._rates, "global_rate": self._global_rate}
+
+    def set_state(self, state: dict) -> None:
+        """Restore state saved by get_state()."""
+        self._rates = state["rates"]
+        self._global_rate = state["global_rate"]
+
     def estimate(self, aircraft_type: str, distance_km: float) -> dict:
         """Estimate fuel burn using the fallback model."""
         category = _classify_aircraft(aircraft_type)

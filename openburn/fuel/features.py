@@ -116,6 +116,7 @@ class FeatureExtractor:
         "fuel_density": ["density"],
         "fuel_type": ["fuel_type"],
         "fau_kg": ["fau_kg"],
+        "leg_type": ["leg_type"],
     }
 
     def load_fuel_csv(self, path: str, **kwargs) -> pd.DataFrame:
@@ -133,6 +134,13 @@ class FeatureExtractor:
         if "cruise_altitude_ft" in df.columns:
             fl_mask = df["cruise_altitude_ft"] < 600
             df.loc[fl_mask, "cruise_altitude_ft"] = df.loc[fl_mask, "cruise_altitude_ft"] * 100
+
+        # Airline operational data tags each leg with a LEG_TYPE code.
+        # 1 = standard revenue flight; other codes (ferry/training/positioning
+        # legs) have very different fuel profiles and would add noise to a
+        # per-family model, so drop them when this column is present.
+        if "leg_type" in df.columns:
+            df = df[df["leg_type"] == 1]
 
         # Must have fuel and distance
         df = df.dropna(subset=["fuel_burn_kg", "distance_km"])
