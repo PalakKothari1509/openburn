@@ -1,7 +1,7 @@
 """OpenBurn REST API — aviation fuel burn estimation service."""
 
 import os
-import tempfile
+import shutil
 from werkzeug.utils import secure_filename
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -17,6 +17,28 @@ FRONTEND_DIR = os.path.abspath(
 MODEL_PATH = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "trained_model.joblib")
 )
+# Every CSV ever trained on gets kept here, so a new upload ADDS to the
+# model instead of silently replacing everything that came before it.
+TRAINING_DATA_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "training_history")
+)
+os.makedirs(TRAINING_DATA_DIR, exist_ok=True)
+
+
+def _accumulated_csv_paths() -> list[str]:
+    """All CSVs trained on so far (old + new), used so every /train call
+    retrains on the full accumulated history, not just the latest file."""
+    return sorted(
+        os.path.join(TRAINING_DATA_DIR, f)
+        for f in os.listdir(TRAINING_DATA_DIR)
+        if f.lower().endswith(".csv")
+    )
+
+
+def _clear_training_history() -> None:
+    for f in os.listdir(TRAINING_DATA_DIR):
+        if f.lower().endswith(".csv"):
+            os.remove(os.path.join(TRAINING_DATA_DIR, f))
 
 app = Flask(__name__)
 CORS(app)
@@ -65,8 +87,14 @@ def health():
 def train():
     """Train model from one or more CSV file paths.
 
+    By default this ADDS to everything previously trained on — the new
+    file(s) are kept alongside every past one, and the model retrains on
+    the full combined history. Pass "replace": true to discard previous
+    data and start fresh with only the file(s) given here.
+
     POST body: {"csv_path": "/path/to/fuel_data.csv"}
     or:        {"csv_paths": ["/path/jan.csv", "/path/feb.csv"]} to combine several
+    optional:  "replace": true
     """
     data = request.get_json()
     csv_paths = data.get("csv_paths")
@@ -77,7 +105,12 @@ def train():
 
     test_size = float(data.get("test_size", 0.2))
     try:
-        result = model.train_from_csv(csv_paths, test_size=test_size)
+        if data.get("replace"):
+            _clear_training_history()
+        for p in csv_paths:
+            shutil.copy(p, os.path.join(TRAINING_DATA_DIR, os.path.basename(p)))
+
+        result = model.train_from_csv(_accumulated_csv_paths(), test_size=test_size)
         model.save_model(MODEL_PATH)
         return jsonify({"status": "trained", **_clean_numpy(result)})
     except Exception as e:
@@ -86,11 +119,15 @@ def train():
 
 @app.route("/train/upload", methods=["POST"])
 def train_upload():
-    """Train model from one or more uploaded CSV files (combined into a
-    single training run if more than one), instead of a server path.
+    """Train model from one or more uploaded CSV files.
+
+    By default this ADDS to everything previously trained on — uploaded
+    files are kept alongside every past one, and the model retrains on
+    the full combined history. Pass "replace": "true" (form field) to
+    discard previous data and start fresh with only the file(s) given here.
 
     multipart/form-data: one or more "file" fields (the CSVs), optional
-    "test_size" field.
+    "test_size" and "replace" fields.
     """
     files = [f for f in request.files.getlist("file") if f.filename]
     if not files:
@@ -100,30 +137,19 @@ def train_upload():
             return jsonify({"error": f"File must be a .csv: {f.filename}"}), 400
 
     test_size = float(request.form.get("test_size", 0.2))
+    replace = request.form.get("replace", "").lower() in ("true", "1", "yes", "on")
 
-    # Save each to a temp path so train_from_csv (which expects paths) can
-    # read them, then clean all of them up regardless of outcome.
-    tmp_paths = []
     try:
+        if replace:
+            _clear_training_history()
         for f in files:
-            safe_name = secure_filename(f.filename)
-            fd, tmp_path = tempfile.mkstemp(suffix=f"_{safe_name}")
-            os.close(fd)
-            f.save(tmp_path)
-            tmp_paths.append(tmp_path)
+            f.save(os.path.join(TRAINING_DATA_DIR, secure_filename(f.filename)))
 
-        result = model.train_from_csv(
-            tmp_paths, test_size=test_size,
-            source_names=[secure_filename(f.filename) for f in files],
-        )
+        result = model.train_from_csv(_accumulated_csv_paths(), test_size=test_size)
         model.save_model(MODEL_PATH)
         return jsonify({"status": "trained", **_clean_numpy(result)})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
-    finally:
-        for p in tmp_paths:
-            if os.path.exists(p):
-                os.remove(p)
 
 
 @app.route("/estimate", methods=["POST"])

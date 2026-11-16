@@ -196,7 +196,7 @@ document.getElementById("form-train").addEventListener("submit", async (e) => {
     const csvPaths = fd.get("csv_path").split(",").map((p) => p.trim()).filter(Boolean);
     const data = await api("/train", {
       method: "POST",
-      body: JSON.stringify({ csv_paths: csvPaths }),
+      body: JSON.stringify({ csv_paths: csvPaths, replace: fd.get("replace") === "on" }),
     });
     document.getElementById("train-output").textContent = JSON.stringify(data, null, 2);
     document.getElementById("result-train").hidden = false;

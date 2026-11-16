@@ -103,6 +103,18 @@ label {
   opacity: 0.6;
 }
 
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
 input, textarea {
   display: block;
   width: 100%;
