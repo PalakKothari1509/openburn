@@ -38,7 +38,7 @@ class FuelBurnModel:
         self.fallback = FallbackEstimator()
         self._is_trained = False
         self._training_summary: dict = {}
-        self._avg_speeds: dict[str, float] = {}  # km/min per aircraft family
+        self._duration_models: dict[str, tuple[float, float]] = {}  # family -> (overhead_min, min_per_km)
         self._trained_at: Optional[str] = None  # ISO timestamp of last training
         self._trained_from: Optional[list[str]] = None  # source CSV filename(s)
 
@@ -92,7 +92,7 @@ class FuelBurnModel:
         # even though they're not part of this training data at all.
         self.performance.reset()
         self.fallback.reset()
-        self._avg_speeds = {}
+        self._duration_models = {}
 
         validation_results = None
         if test_size > 0 and len(df) > 50:
@@ -388,28 +388,35 @@ class FuelBurnModel:
         return sorted(_AIRPORT_COORDS.keys())
 
     def _learn_speeds(self, df: pd.DataFrame) -> None:
-        """Learn average speed (km/min) per aircraft family from training data."""
+        """Learn a per-family duration model: fixed ground/climb/descent
+        overhead + a per-km cruise rate, fit from (distance, duration)
+        pairs in the training data.
+
+        A single flat average speed badly distorts any family that flies
+        both short-haul and long-haul routes: the fixed overhead is a much
+        bigger share of a short flight's total time, so mixing the two
+        together pulls the "average speed" away from what either regime
+        actually looks like. Fitting overhead and cruise rate separately
+        (duration = overhead + rate * distance) fixes that.
+        """
         if "aircraft_family" not in df.columns:
             return
         if "distance_km" not in df.columns or "flight_duration_min" not in df.columns:
             return
 
-        valid = df[(df["distance_km"] > 100) & (df["flight_duration_min"] > 30)].copy()
-        valid["speed_km_min"] = valid["distance_km"] / valid["flight_duration_min"]
+        valid = df[(df["distance_km"] > 100) & (df["flight_duration_min"] > 30)]
 
         for family, group in valid.groupby("aircraft_family"):
-            self._avg_speeds[str(family)] = float(group["speed_km_min"].median())
+            self._duration_models[str(family)] = _fit_duration_model(group)
 
-        # Global fallback
-        self._avg_speeds["_global"] = float(valid["speed_km_min"].median())
+        self._duration_models["_global"] = _fit_duration_model(valid)
 
     def _estimate_duration(self, aircraft_type: str, distance_km: float) -> float:
         """Estimate flight duration in minutes from distance and aircraft type."""
-        speed = self._avg_speeds.get(aircraft_type, self._avg_speeds.get("_global", 13.0))
-        # Add taxi/climb/descent overhead (~25 min for short, ~35 for long)
-        base_min = distance_km / speed
-        overhead = 25 + (distance_km / 10000) * 10  # scales with distance
-        return base_min + overhead
+        overhead_min, min_per_km = self._duration_models.get(
+            aircraft_type, self._duration_models.get("_global", (25.0, 1.0 / 8.0))
+        )
+        return overhead_min + min_per_km * distance_km
 
     def save_model(self, path: str | Path) -> None:
         """Save the full trained model (profiles, fallback estimator, learned
@@ -419,7 +426,7 @@ class FuelBurnModel:
         state = {
             "performance": self.performance.get_state(),
             "fallback": self.fallback.get_state(),
-            "avg_speeds": self._avg_speeds,
+            "duration_models": self._duration_models,
             "training_summary": self._training_summary,
             "trained_at": self._trained_at,
             "trained_from": self._trained_from,
@@ -440,7 +447,7 @@ class FuelBurnModel:
             state = joblib.load(path)
             self.performance.set_state(state["performance"])
             self.fallback.set_state(state["fallback"])
-            self._avg_speeds = state.get("avg_speeds", {})
+            self._duration_models = state.get("duration_models", {})
             self._training_summary = state.get("training_summary", {})
             self._trained_at = state.get("trained_at")
             self._trained_from = state.get("trained_from")
@@ -449,6 +456,25 @@ class FuelBurnModel:
             return False
         self._is_trained = True
         return True
+
+
+def _fit_duration_model(group: pd.DataFrame) -> tuple[float, float]:
+    """Fit duration_min = overhead + rate * distance_km via linear
+    regression, so short-haul and long-haul flights in the same family
+    don't drag a single flat speed away from both.
+
+    Falls back to a flat median speed (with a fixed overhead guess) if
+    there's too little data to fit, or the fit comes out physically
+    implausible (overhead should be non-negative; rate should correspond
+    to a believable average speed of roughly 400-3000 km/h).
+    """
+    if len(group) >= 10:
+        rate, overhead = np.polyfit(group["distance_km"], group["flight_duration_min"], 1)
+        if 0.02 <= rate <= 0.15 and 0 <= overhead <= 120:
+            return (float(overhead), float(rate))
+
+    speed = (group["distance_km"] / group["flight_duration_min"]).median()
+    return (25.0, 1.0 / speed) if speed > 0 else (25.0, 1.0 / 8.0)
 
     def save_summary(self, path: str) -> None:
         """Save model summary to JSON."""
