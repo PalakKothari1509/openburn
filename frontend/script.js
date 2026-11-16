@@ -46,14 +46,14 @@ async function checkStatus() {
         ? ` — trained ${new Date(data.trained_at).toLocaleString()} from ${fromNames}`
         : "";
       badge.textContent = `Model trained — ${data.families_available.length} aircraft types${trainedNote}`;
-      badge.className = "status status-trained";
+      badge.className = "label label-primary";
     } else {
       badge.textContent = "Model not trained — go to Train Model tab";
-      badge.className = "status status-untrained";
+      badge.className = "label label-warning";
     }
   } catch {
     document.getElementById("model-status").textContent = "API offline — start the server with: python api/app.py";
-    document.getElementById("model-status").className = "status status-untrained";
+    document.getElementById("model-status").className = "label label-danger";
   }
 }
 checkStatus();
@@ -79,11 +79,11 @@ document.getElementById("form-route").addEventListener("submit", async (e) => {
       `${data.route.departure} → ${data.route.arrival} · ${data.aircraft_family}`;
 
     document.getElementById("route-fuel").textContent = formatNum(data.fuel_burn_kg);
-    document.getElementById("route-co2").textContent = `${formatNum(data.emissions.co2)} kg`;
-    document.getElementById("route-distance").textContent = `${formatNum(data.route.distance_km)} km`;
-    document.getElementById("route-duration").textContent = `${formatNum(Math.round(data.route.estimated_duration_min))} min`;
+    document.getElementById("route-co2").textContent = formatNum(data.emissions.co2);
+    document.getElementById("route-distance").textContent = formatNum(data.route.distance_km);
+    document.getElementById("route-duration").textContent = formatNum(Math.round(data.route.estimated_duration_min));
     document.getElementById("route-confidence").textContent = data.confidence;
-    document.getElementById("route-rmse").textContent = data.model_rmse_kg ? `${formatNum(data.model_rmse_kg)} kg` : "N/A";
+    document.getElementById("route-rmse").textContent = data.model_rmse_kg ? formatNum(data.model_rmse_kg) : "N/A";
 
     const routeWarning = document.getElementById("route-warning");
     if (data.warning) {
@@ -124,7 +124,7 @@ document.getElementById("form-estimate").addEventListener("submit", async (e) =>
   try {
     const data = await api("/estimate", { method: "POST", body: JSON.stringify(body) });
     document.getElementById("est-fuel").textContent = formatNum(data.fuel_burn_kg);
-    document.getElementById("est-co2").textContent = `${formatNum(data.emissions.co2)} kg`;
+    document.getElementById("est-co2").textContent = formatNum(data.emissions.co2);
     document.getElementById("est-method").textContent = data.method;
     document.getElementById("est-confidence").textContent = data.confidence;
 
@@ -253,20 +253,15 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
     document.getElementById("sum-rmse").textContent = overall ? formatNum(overall.rmse_kg) : "N/A";
     document.getElementById("result-summary").hidden = false;
 
-    // Per-family rows, with top 3 most important factors for each aircraft
+    // Per-family table rows, with top 3 most important factors for each aircraft
     document.getElementById("family-grid").innerHTML = Object.entries(families)
       .map(([fam, info]) => {
         const topFactors = Object.entries(info.feature_importance || {})
           .sort((a, b) => b[1] - a[1])
           .slice(0, 3)
           .map(([name]) => name.replace(/_/g, " "))
-          .join(" · ");
-        return `
-          <div class="fam-row">
-            <span class="f-name">${fam}</span>
-            <span class="f-factors">${topFactors}</span>
-            <span class="f-meta">${formatNum(info.n_training_flights)} flights · RMSE ${formatNum(info.rmse_kg)} kg</span>
-          </div>`;
+          .join(", ");
+        return `<tr><td><strong>${fam}</strong></td><td>${formatNum(info.rmse_kg)}</td><td>${formatNum(info.n_training_flights)}</td><td>${topFactors}</td></tr>`;
       })
       .join("");
     document.getElementById("result-families").hidden = false;
