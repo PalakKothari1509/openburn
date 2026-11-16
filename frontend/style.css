@@ -221,6 +221,14 @@ input[type="file"].form-control { border: none; padding: 0.3rem 0; background: n
 .btn-primary:hover { background: var(--accent-dark); }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
+.btn-link {
+  background: none;
+  color: var(--accent-dark);
+  padding: 0.6rem 0.9rem;
+  text-decoration: underline;
+}
+.btn-link:hover { color: var(--accent); }
+
 .hr-line-dashed { border-top: 1px dashed var(--border); margin: 1.4rem 0; }
 
 .summary-line {
@@ -264,6 +272,20 @@ input[type="file"].form-control { border: none; padding: 0.3rem 0; background: n
 .stat-box-primary .stat-value { color: var(--accent-dark); }
 .stat-value.small { font-size: 0.72rem; font-weight: 600; word-break: break-all; }
 
+.confidence-pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--muted);
+}
+.confidence-pill.confidence-high { background: var(--accent); }
+.confidence-pill.confidence-low { background: var(--warning); }
+
 /* ---------- Alerts ---------- */
 
 .alert { padding: 0.75rem 1rem; border-radius: 3px; font-size: 0.82rem; margin-top: 0.9rem; }
@@ -277,14 +299,43 @@ input[type="file"].form-control { border: none; padding: 0.3rem 0; background: n
 
 .emission-row {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--border);
   font-size: 0.82rem;
   color: var(--muted);
 }
 .emission-row:last-child { border-bottom: none; }
-.emission-row span:last-child { color: var(--text); font-weight: 600; }
+.emission-row .emission-name { flex: 0 0 80px; }
+.emission-row .emission-bar-track {
+  flex: 1 1 auto;
+  height: 8px;
+  background: var(--row-stripe);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.emission-row .emission-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+}
+.emission-row .emission-value { flex: 0 0 auto; color: var(--text); font-weight: 600; white-space: nowrap; }
+
+.bar-cell { display: flex; align-items: center; gap: 0.5rem; }
+.bar-cell .bar-track {
+  flex: 1 1 60px;
+  height: 6px;
+  background: var(--row-stripe);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bar-cell .bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+}
+.bar-cell .bar-number { flex: 0 0 auto; white-space: nowrap; }
 
 /* ---------- Tables ---------- */
 

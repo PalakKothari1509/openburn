@@ -1,6 +1,7 @@
 const API_BASE = window.location.origin;
 
 // Tab switching
+let familiesLoaded = false;
 document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
@@ -8,8 +9,44 @@ document.querySelectorAll(".tab").forEach((btn) => {
     btn.classList.add("active");
     document.getElementById(`tab-${btn.dataset.tab}`).classList.remove("hidden");
     hideError();
+    if (btn.dataset.tab === "families" && !familiesLoaded) {
+      document.getElementById("btn-load-families").click();
+    }
   });
 });
+
+// Toggle a submit button into/out of a "working" state so slow requests
+// (and accidental double-submits) give visible feedback.
+function setBusy(btn, busyText, idleText) {
+  btn.disabled = true;
+  btn.dataset.idleText = idleText;
+  btn.textContent = busyText;
+}
+function clearBusy(btn) {
+  btn.disabled = false;
+  btn.textContent = btn.dataset.idleText;
+}
+
+function setConfidencePill(el, confidence) {
+  el.textContent = confidence || "-";
+  el.classList.remove("confidence-high", "confidence-low");
+  if (confidence === "high") el.classList.add("confidence-high");
+  else if (confidence === "low") el.classList.add("confidence-low");
+}
+
+function renderEmissionsBreakdown(container, emissions) {
+  const max = Math.max(...Object.values(emissions).map((v) => Number(v) || 0));
+  container.innerHTML = Object.entries(emissions)
+    .map(([k, v]) => {
+      const pct = max > 0 ? Math.max((Number(v) / max) * 100, 2) : 0;
+      return `<div class="emission-row">
+        <span class="emission-name">${k.toUpperCase()}</span>
+        <span class="emission-bar-track"><span class="emission-bar-fill" style="width:${pct}%"></span></span>
+        <span class="emission-value">${formatNum(v)} kg</span>
+      </div>`;
+    })
+    .join("");
+}
 
 function showError(msg) {
   const box = document.getElementById("error-box");
@@ -51,12 +88,68 @@ async function checkStatus() {
       badge.textContent = "Model not trained — go to Train Model tab";
       badge.className = "label label-warning";
     }
+    populateAircraftSelect(data.model_trained ? data.families_available : []);
   } catch {
     document.getElementById("model-status").textContent = "API offline — start the server with: python api/app.py";
     document.getElementById("model-status").className = "label label-danger";
+    populateAircraftSelect([]);
   }
 }
+
+// Keep the Route tab's aircraft dropdown in sync with whatever the model
+// is actually trained on, instead of a hardcoded list that can drift.
+function populateAircraftSelect(families) {
+  const select = document.getElementById("aircraft-select");
+  const form = document.getElementById("form-route");
+  const wanted = form.dataset.restoreAircraft || select.value;
+  if (families.length === 0) {
+    select.innerHTML = `<option value="">Train a model first...</option>`;
+    return;
+  }
+  select.innerHTML =
+    `<option value="">Select...</option>` +
+    families.map((f) => `<option value="${f}">${f}</option>`).join("");
+  if (families.includes(wanted)) {
+    select.value = wanted;
+    delete form.dataset.restoreAircraft;
+  }
+}
+
+// Populate the shared airport-code datalist used by the Departure/Arrival
+// inputs, so typos get caught by autocomplete instead of a failed request.
+async function loadAirportCodes() {
+  try {
+    const data = await api("/airports");
+    document.getElementById("airport-codes").innerHTML = data.airports
+      .map((code) => `<option value="${code}"></option>`)
+      .join("");
+  } catch {
+    // Non-critical — inputs still work without autocomplete.
+  }
+}
+
+// Remember the last-used route inputs so returning visitors don't have to
+// re-type them. Browser storage only; never required for the app to work.
+function rememberRouteInputs(body) {
+  try {
+    localStorage.setItem("openburn.lastRoute", JSON.stringify(body));
+  } catch {}
+}
+function restoreRouteInputs() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("openburn.lastRoute") || "null");
+    if (!saved) return;
+    const form = document.getElementById("form-route");
+    if (saved.departure) form.querySelector('[name="departure"]').value = saved.departure;
+    if (saved.arrival) form.querySelector('[name="arrival"]').value = saved.arrival;
+    if (saved.passengers) form.querySelector('[name="passengers"]').value = saved.passengers;
+    if (saved.aircraft_type) form.dataset.restoreAircraft = saved.aircraft_type;
+  } catch {}
+}
+
 checkStatus();
+loadAirportCodes();
+restoreRouteInputs();
 
 // ============================================================
 // Route-based estimate (primary)
@@ -72,6 +165,8 @@ document.getElementById("form-route").addEventListener("submit", async (e) => {
   };
   if (fd.get("passengers")) body.passengers = fd.get("passengers");
 
+  const btn = e.target.querySelector("button[type=submit]");
+  setBusy(btn, "Calculating...", "Calculate Fuel Burn");
   try {
     const data = await api("/estimate/route", { method: "POST", body: JSON.stringify(body) });
 
@@ -82,7 +177,7 @@ document.getElementById("form-route").addEventListener("submit", async (e) => {
     document.getElementById("route-co2").textContent = formatNum(data.emissions.co2);
     document.getElementById("route-distance").textContent = formatNum(data.route.distance_km);
     document.getElementById("route-duration").textContent = formatNum(Math.round(data.route.estimated_duration_min));
-    document.getElementById("route-confidence").textContent = data.confidence;
+    setConfidencePill(document.getElementById("route-confidence"), data.confidence);
     document.getElementById("route-rmse").textContent = data.model_rmse_kg ? formatNum(data.model_rmse_kg) : "N/A";
 
     const routeWarning = document.getElementById("route-warning");
@@ -93,15 +188,14 @@ document.getElementById("form-route").addEventListener("submit", async (e) => {
       routeWarning.hidden = true;
     }
 
-    // Emissions breakdown
-    const breakdown = document.getElementById("route-emissions-breakdown");
-    breakdown.innerHTML = Object.entries(data.emissions)
-      .map(([k, v]) => `<div class="emission-row"><span>${k.toUpperCase()}</span><span>${formatNum(v)} kg</span></div>`)
-      .join("");
+    renderEmissionsBreakdown(document.getElementById("route-emissions-breakdown"), data.emissions);
 
     document.getElementById("result-route").hidden = false;
+    rememberRouteInputs(body);
   } catch (err) {
     showError(err.message);
+  } finally {
+    clearBusy(btn);
   }
 });
 
@@ -121,12 +215,14 @@ document.getElementById("form-estimate").addEventListener("submit", async (e) =>
   if (fd.get("flight_duration_min")) body.flight_duration_min = fd.get("flight_duration_min");
   if (fd.get("cruise_altitude_ft")) body.cruise_altitude_ft = fd.get("cruise_altitude_ft");
 
+  const btn = e.target.querySelector("button[type=submit]");
+  setBusy(btn, "Estimating...", "Estimate Fuel Burn");
   try {
     const data = await api("/estimate", { method: "POST", body: JSON.stringify(body) });
     document.getElementById("est-fuel").textContent = formatNum(data.fuel_burn_kg);
     document.getElementById("est-co2").textContent = formatNum(data.emissions.co2);
     document.getElementById("est-method").textContent = data.method;
-    document.getElementById("est-confidence").textContent = data.confidence;
+    setConfidencePill(document.getElementById("est-confidence"), data.confidence);
 
     const estWarning = document.getElementById("est-warning");
     if (data.warning) {
@@ -136,14 +232,13 @@ document.getElementById("form-estimate").addEventListener("submit", async (e) =>
       estWarning.hidden = true;
     }
 
-    const breakdown = document.getElementById("emissions-breakdown");
-    breakdown.innerHTML = Object.entries(data.emissions)
-      .map(([k, v]) => `<div class="emission-row"><span>${k.toUpperCase()}</span><span>${formatNum(v)} kg</span></div>`)
-      .join("");
+    renderEmissionsBreakdown(document.getElementById("emissions-breakdown"), data.emissions);
 
     document.getElementById("result-estimate").hidden = false;
   } catch (err) {
     showError(err.message);
+  } finally {
+    clearBusy(btn);
   }
 });
 
@@ -154,6 +249,8 @@ document.getElementById("form-batch").addEventListener("submit", async (e) => {
   e.preventDefault();
   hideError();
   const fd = new FormData(e.target);
+  const btn = e.target.querySelector("button[type=submit]");
+  setBusy(btn, "Estimating...", "Estimate Batch");
   try {
     const flights = JSON.parse(fd.get("flights"));
     const data = await api("/estimate/batch", { method: "POST", body: JSON.stringify({ flights }) });
@@ -175,33 +272,55 @@ document.getElementById("form-batch").addEventListener("submit", async (e) => {
     document.getElementById("result-batch").hidden = false;
   } catch (err) {
     showError(err.message);
+  } finally {
+    clearBusy(btn);
   }
+});
+
+document.getElementById("btn-load-example").addEventListener("click", () => {
+  const textarea = document.querySelector('#form-batch [name="flights"]');
+  textarea.value = JSON.stringify(
+    [
+      { aircraft_type: "A320", distance_km: 1500 },
+      { aircraft_type: "E190", distance_km: 800 },
+    ],
+    null,
+    2
+  );
 });
 
 // ============================================================
 // Train model
 // ============================================================
+function renderTrainOutput(data) {
+  document.getElementById("train-total").textContent = formatNum(data.total_flights);
+  document.getElementById("train-families").textContent = (data.families_trained || []).join(", ") || "-";
+  const overall = data.holdout_validation && data.holdout_validation.overall;
+  document.getElementById("train-mape").textContent = overall ? `${overall.mape_pct}%` : "N/A";
+  document.getElementById("train-r2").textContent = overall ? overall.r_squared : "N/A";
+  document.getElementById("train-output").textContent = JSON.stringify(data, null, 2);
+  document.getElementById("result-train").hidden = false;
+}
+
 document.getElementById("form-train").addEventListener("submit", async (e) => {
   e.preventDefault();
   hideError();
   const fd = new FormData(e.target);
   const btn = e.target.querySelector("button");
-  btn.textContent = "Training...";
-  btn.disabled = true;
+  setBusy(btn, "Training...", "Train from Path");
   try {
     const csvPaths = fd.get("csv_path").split(",").map((p) => p.trim()).filter(Boolean);
     const data = await api("/train", {
       method: "POST",
       body: JSON.stringify({ csv_paths: csvPaths, replace: fd.get("replace") === "on" }),
     });
-    document.getElementById("train-output").textContent = JSON.stringify(data, null, 2);
-    document.getElementById("result-train").hidden = false;
+    renderTrainOutput(data);
     checkStatus();
+    familiesLoaded = false;
   } catch (err) {
     showError(err.message);
   } finally {
-    btn.textContent = "Train Model";
-    btn.disabled = false;
+    clearBusy(btn);
   }
 });
 
@@ -213,22 +332,20 @@ document.getElementById("form-train-upload").addEventListener("submit", async (e
   hideError();
   const fd = new FormData(e.target);
   const btn = e.target.querySelector("button");
-  btn.textContent = "Uploading & Training...";
-  btn.disabled = true;
+  setBusy(btn, "Uploading & Training...", "Upload & Train");
   try {
     // Don't use the api() helper here — it forces a JSON content-type,
     // which breaks multipart/form-data file uploads. Let fetch set its own.
     const res = await fetch(`${API_BASE}/train/upload`, { method: "POST", body: fd });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Unknown error");
-    document.getElementById("train-output").textContent = JSON.stringify(data, null, 2);
-    document.getElementById("result-train").hidden = false;
+    renderTrainOutput(data);
     checkStatus();
+    familiesLoaded = false;
   } catch (err) {
     showError(err.message);
   } finally {
-    btn.textContent = "Upload & Train";
-    btn.disabled = false;
+    clearBusy(btn);
   }
 });
 
@@ -237,6 +354,8 @@ document.getElementById("form-train-upload").addEventListener("submit", async (e
 // ============================================================
 document.getElementById("btn-load-families").addEventListener("click", async () => {
   hideError();
+  const btn = document.getElementById("btn-load-families");
+  setBusy(btn, "Loading...", "Refresh");
   try {
     const [families, summary] = await Promise.all([api("/families"), api("/model/summary")]);
 
@@ -253,7 +372,10 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
     document.getElementById("sum-rmse").textContent = overall ? `${formatNum(overall.rmse_kg)} kg` : "N/A";
     document.getElementById("result-summary").hidden = false;
 
-    // Per-family table rows, with top 3 most important factors for each aircraft
+    // Per-family table rows, with an inline bar (relative to the worst
+    // family's RMSE) so accuracy differences are visible at a glance,
+    // plus the top 3 most important factors for each aircraft.
+    const maxRmse = Math.max(...Object.values(families).map((info) => info.rmse_kg || 0));
     document.getElementById("family-grid").innerHTML = Object.entries(families)
       .map(([fam, info]) => {
         const topFactors = Object.entries(info.feature_importance || {})
@@ -261,11 +383,19 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
           .slice(0, 3)
           .map(([name]) => name.replace(/_/g, " "))
           .join(", ");
-        return `<tr><td><strong>${fam}</strong></td><td>${formatNum(info.rmse_kg)}</td><td>${formatNum(info.n_training_flights)}</td><td>${topFactors}</td></tr>`;
+        const pct = maxRmse > 0 ? Math.max((info.rmse_kg / maxRmse) * 100, 2) : 0;
+        const rmseCell = `<span class="bar-cell">
+          <span class="bar-track"><span class="bar-fill" style="width:${pct}%"></span></span>
+          <span class="bar-number">${formatNum(info.rmse_kg)}</span>
+        </span>`;
+        return `<tr><td><strong>${fam}</strong></td><td>${rmseCell}</td><td>${formatNum(info.n_training_flights)}</td><td>${topFactors}</td></tr>`;
       })
       .join("");
     document.getElementById("result-families").hidden = false;
+    familiesLoaded = true;
   } catch (err) {
     showError(err.message);
+  } finally {
+    clearBusy(btn);
   }
 });

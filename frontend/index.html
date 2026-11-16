@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OpenBurn — Aviation Fuel Burn Estimation</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231ab394'/%3E%3Cpath d='M16 4l2.5 7H26l-5 4 2 7-7-4.5L9 22l2-7-5-4h7.5z' fill='%23fff'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -33,10 +34,12 @@
     <div id="page-wrapper" class="gray-bg">
       <nav class="navbar navbar-static-top">
         <span class="navbar-title">Aviation Fuel Burn Dashboard</span>
-        <span id="model-status" class="label label-warning">Model not trained</span>
+        <span id="model-status" class="label label-warning" role="status" aria-live="polite">Model not trained</span>
       </nav>
 
       <div class="wrapper-content">
+
+        <div class="alert alert-danger hidden" id="error-box" role="alert" aria-live="assertive"></div>
 
         <!-- Route-based estimate (primary) -->
         <section class="card" id="tab-route">
@@ -48,24 +51,16 @@
                 <div class="row">
                   <div class="form-group col-sm-3">
                     <label>Departure</label>
-                    <input type="text" class="form-control" name="departure" placeholder="MAD" maxlength="4" required />
+                    <input type="text" class="form-control" name="departure" placeholder="MAD" maxlength="4" list="airport-codes" autocomplete="off" required />
                   </div>
                   <div class="form-group col-sm-3">
                     <label>Arrival</label>
-                    <input type="text" class="form-control" name="arrival" placeholder="LHR" maxlength="4" required />
+                    <input type="text" class="form-control" name="arrival" placeholder="LHR" maxlength="4" list="airport-codes" autocomplete="off" required />
                   </div>
                   <div class="form-group col-sm-3">
                     <label>Aircraft Type</label>
                     <select class="form-control" name="aircraft_type" id="aircraft-select" required>
-                      <option value="">Select...</option>
-                      <option value="A319">A319</option>
-                      <option value="A320">A320</option>
-                      <option value="A20N">A20N</option>
-                      <option value="A21N">A21N</option>
-                      <option value="A332">A332</option>
-                      <option value="A339">A339</option>
-                      <option value="E190">E190</option>
-                      <option value="E195">E195</option>
+                      <option value="">Train a model first...</option>
                     </select>
                   </div>
                   <div class="form-group col-sm-3">
@@ -75,6 +70,7 @@
                 </div>
                 <button type="submit" class="btn btn-primary">Calculate Fuel Burn</button>
               </form>
+              <datalist id="airport-codes"></datalist>
             </div>
           </div>
 
@@ -100,7 +96,7 @@
                 </div>
                 <div class="stat-box">
                   <span class="stat-label">Confidence</span>
-                  <span class="stat-value" id="route-confidence">-</span>
+                  <span class="stat-value confidence-pill" id="route-confidence">-</span>
                 </div>
                 <div class="stat-box">
                   <span class="stat-label">Model RMSE (kg)</span>
@@ -164,7 +160,7 @@
                 </div>
                 <div class="stat-box">
                   <span class="stat-label">Confidence</span>
-                  <span class="stat-value" id="est-confidence">-</span>
+                  <span class="stat-value confidence-pill" id="est-confidence">-</span>
                 </div>
               </div>
               <div class="alert alert-warning" id="est-warning" hidden></div>
@@ -188,6 +184,7 @@
                   <textarea class="form-control" name="flights" rows="7" placeholder='[{"aircraft_type":"A320","distance_km":1500},{"aircraft_type":"E190","distance_km":800}]'></textarea>
                 </div>
                 <button type="submit" class="btn btn-primary">Estimate Batch</button>
+                <button type="button" class="btn btn-link" id="btn-load-example">Load example</button>
               </form>
             </div>
           </div>
@@ -240,7 +237,28 @@
           <div class="ibox" id="result-train" hidden>
             <div class="ibox-title"><h5>Training Output</h5></div>
             <div class="ibox-content">
-              <pre id="train-output"></pre>
+              <div class="stat-grid">
+                <div class="stat-box stat-box-primary">
+                  <span class="stat-label">Total Flights</span>
+                  <span class="stat-value" id="train-total">-</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-label">Families Trained</span>
+                  <span class="stat-value" id="train-families">-</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-label">Holdout MAPE</span>
+                  <span class="stat-value" id="train-mape">-</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-label">Holdout R&#178;</span>
+                  <span class="stat-value" id="train-r2">-</span>
+                </div>
+              </div>
+              <details class="more">
+                <summary>Full raw response</summary>
+                <pre id="train-output"></pre>
+              </details>
             </div>
           </div>
         </section>
@@ -251,7 +269,7 @@
             <div class="ibox-title"><h5>Trained Aircraft Families</h5></div>
             <div class="ibox-content">
               <p class="ibox-lead">What the model has learned so far, and which factors matter most.</p>
-              <button id="btn-load-families" class="btn btn-primary">Load Families</button>
+              <button id="btn-load-families" class="btn btn-primary">Refresh</button>
 
               <div id="result-summary" hidden>
                 <div class="hr-line-dashed"></div>
@@ -277,7 +295,6 @@
           </div>
         </section>
 
-        <div class="alert alert-danger hidden" id="error-box"></div>
       </div>
     </div>
   </div>
