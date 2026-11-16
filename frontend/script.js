@@ -240,12 +240,31 @@ document.getElementById("form-train-upload").addEventListener("submit", async (e
 document.getElementById("btn-load-families").addEventListener("click", async () => {
   hideError();
   try {
-    const data = await api("/families");
+    const [families, summary] = await Promise.all([api("/families"), api("/model/summary")]);
+
+    // Training summary (persists across restarts, unlike the one-time /train response)
+    document.getElementById("sum-trained-at").textContent = summary.trained_at
+      ? new Date(summary.trained_at).toLocaleString()
+      : "-";
+    document.getElementById("sum-trained-from").textContent = summary.trained_from || "-";
+    document.getElementById("sum-total").textContent = formatNum(summary.total_flights);
+    const overall = summary.holdout_validation && summary.holdout_validation.overall;
+    document.getElementById("sum-mape").textContent = overall ? overall.mape_pct : "N/A";
+    document.getElementById("sum-r2").textContent = overall ? overall.r_squared : "N/A";
+    document.getElementById("sum-rmse").textContent = overall ? formatNum(overall.rmse_kg) : "N/A";
+    document.getElementById("result-summary").hidden = false;
+
+    // Per-family table, with top 3 most important factors for each aircraft
     const tbody = document.getElementById("families-table").querySelector("tbody");
-    tbody.innerHTML = Object.entries(data)
-      .map(([fam, info]) =>
-        `<tr><td>${fam}</td><td>${formatNum(info.rmse_kg)}</td><td>${formatNum(info.n_training_flights)}</td></tr>`
-      )
+    tbody.innerHTML = Object.entries(families)
+      .map(([fam, info]) => {
+        const topFactors = Object.entries(info.feature_importance || {})
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([name]) => name)
+          .join(", ");
+        return `<tr><td>${fam}</td><td>${formatNum(info.rmse_kg)}</td><td>${formatNum(info.n_training_flights)}</td><td>${topFactors}</td></tr>`;
+      })
       .join("");
     document.getElementById("result-families").hidden = false;
   } catch (err) {

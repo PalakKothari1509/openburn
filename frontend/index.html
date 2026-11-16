@@ -191,13 +191,48 @@
     <section class="card hidden" id="tab-families">
       <h2>Trained Aircraft Families</h2>
       <button id="btn-load-families">Load Families</button>
+
+      <div class="result" id="result-summary" hidden>
+        <p class="section-label">Training Summary</p>
+        <div class="result-grid">
+          <div class="result-item">
+            <span class="label">Trained At</span>
+            <span class="value" id="sum-trained-at">-</span>
+          </div>
+          <div class="result-item">
+            <span class="label">Source File</span>
+            <span class="value small" id="sum-trained-from">-</span>
+          </div>
+          <div class="result-item">
+            <span class="label">Total Flights</span>
+            <span class="value" id="sum-total">-</span>
+          </div>
+          <div class="result-item primary">
+            <span class="label">Holdout MAPE</span>
+            <span class="value" id="sum-mape">-</span>
+            <span class="unit">%</span>
+          </div>
+          <div class="result-item">
+            <span class="label">R&#178;</span>
+            <span class="value" id="sum-r2">-</span>
+          </div>
+          <div class="result-item">
+            <span class="label">Holdout RMSE</span>
+            <span class="value" id="sum-rmse">-</span>
+            <span class="unit">kg</span>
+          </div>
+        </div>
+      </div>
+
       <div id="result-families" hidden>
+        <p class="section-label">Per-Aircraft Detail</p>
         <table id="families-table">
           <thead>
             <tr>
               <th>Family</th>
               <th>RMSE (kg)</th>
               <th>Training Flights</th>
+              <th>Top Factors</th>
             </tr>
           </thead>
           <tbody></tbody>

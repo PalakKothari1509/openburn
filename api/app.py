@@ -219,6 +219,22 @@ def list_airports():
     return jsonify({"airports": model.get_airports()})
 
 
+@app.route("/model/summary", methods=["GET"])
+def model_summary():
+    """Full training summary (holdout validation, flight counts, etc).
+
+    Unlike the one-time response from /train, this persists across
+    server restarts since it's saved alongside the model.
+    """
+    if not model._is_trained:
+        return jsonify({"error": "Model not trained yet"}), 400
+    return jsonify(_clean_numpy({
+        "trained_at": model._trained_at,
+        "trained_from": model._trained_from,
+        **model._training_summary,
+    }))
+
+
 @app.route("/data/summary", methods=["POST"])
 def data_summary():
     """Get summary of a fuel data CSV without training.
