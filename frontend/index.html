@@ -8,15 +8,9 @@
 </head>
 <body>
   <div class="app">
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark">OB</span>
-        <div>
-          <h1>OpenBurn</h1>
-          <p class="subtitle">Open-source aviation fuel burn estimation</p>
-        </div>
-      </div>
-      <div id="model-status" class="status-badge status-untrained">Model not trained</div>
+    <header>
+      <h1>OpenBurn</h1>
+      <p id="model-status" class="status status-untrained">Model not trained</p>
     </header>
 
     <nav class="tabs">
@@ -29,128 +23,126 @@
 
     <!-- Route-based estimate (primary) -->
     <section class="card" id="tab-route">
-      <div class="card-head">
-        <h2>Fuel Burn by Route</h2>
-        <p>Enter departure, arrival, and aircraft type to estimate fuel burn.</p>
-      </div>
-      <div class="split">
-        <form id="form-route">
-          <div class="form-row">
-            <label>Departure Airport
-              <input type="text" name="departure" placeholder="e.g. MAD, LHR, JFK" maxlength="4" required />
-            </label>
-            <label>Arrival Airport
-              <input type="text" name="arrival" placeholder="e.g. LHR, KEF, BCN" maxlength="4" required />
+      <h2>Fuel burn by route</h2>
+      <p class="lead">Enter departure, arrival, and aircraft type.</p>
+
+      <form id="form-route">
+        <div class="field-group">
+          <div class="field">
+            <label>Departure
+              <input type="text" name="departure" placeholder="MAD" maxlength="4" required />
             </label>
           </div>
-          <label>Aircraft Type
-            <select name="aircraft_type" id="aircraft-select" required>
-              <option value="">Select aircraft...</option>
-              <option value="A319">A319 — Airbus A319</option>
-              <option value="A320">A320 — Airbus A320</option>
-              <option value="A20N">A20N — Airbus A320neo</option>
-              <option value="A21N">A21N — Airbus A321neo</option>
-              <option value="A332">A332 — Airbus A330-200</option>
-              <option value="A339">A339 — Airbus A330-900neo</option>
-              <option value="E190">E190 — Embraer E190</option>
-              <option value="E195">E195 — Embraer E195</option>
-            </select>
-          </label>
-          <label>Passengers <span class="optional">optional</span>
-            <input type="number" name="passengers" placeholder="e.g. 150" min="0" max="600" step="1" />
-          </label>
-          <button type="submit">Calculate Fuel Burn</button>
-        </form>
-
-        <div class="result-panel">
-          <div class="result" id="result-route" hidden>
-            <div class="route-header" id="route-header"></div>
-
-            <div class="hero-stat">
-              <span class="hero-label">Fuel Burn</span>
-              <span class="hero-value" id="route-fuel">-</span>
-              <span class="hero-unit">kg</span>
-            </div>
-
-            <div class="chip-row">
-              <div class="chip"><span class="chip-label">CO&#8322;</span><span class="chip-value" id="route-co2">-</span><span class="chip-unit">kg</span></div>
-              <div class="chip"><span class="chip-label">Distance</span><span class="chip-value" id="route-distance">-</span><span class="chip-unit">km</span></div>
-              <div class="chip"><span class="chip-label">Duration</span><span class="chip-value" id="route-duration">-</span><span class="chip-unit">min</span></div>
-              <div class="chip"><span class="chip-label">Confidence</span><span class="chip-value" id="route-confidence">-</span></div>
-              <div class="chip"><span class="chip-label">RMSE</span><span class="chip-value" id="route-rmse">-</span><span class="chip-unit">kg</span></div>
-            </div>
-
-            <div class="warning-box hidden" id="route-warning"></div>
-            <details class="emissions-detail">
-              <summary>Full emissions breakdown</summary>
-              <div id="route-emissions-breakdown"></div>
-            </details>
+          <div class="field">
+            <label>Arrival
+              <input type="text" name="arrival" placeholder="LHR" maxlength="4" required />
+            </label>
           </div>
-          <div class="result-empty">Fill in the form to see a fuel burn estimate here.</div>
+          <div class="field">
+            <label>Aircraft
+              <select name="aircraft_type" id="aircraft-select" required>
+                <option value="">Select...</option>
+                <option value="A319">A319</option>
+                <option value="A320">A320</option>
+                <option value="A20N">A20N</option>
+                <option value="A21N">A21N</option>
+                <option value="A332">A332</option>
+                <option value="A339">A339</option>
+                <option value="E190">E190</option>
+                <option value="E195">E195</option>
+              </select>
+            </label>
+          </div>
+          <div class="field">
+            <label>Passengers <span class="optional">optional</span>
+              <input type="number" name="passengers" placeholder="150" min="0" max="600" step="1" />
+            </label>
+          </div>
         </div>
+        <button type="submit" class="btn">Calculate</button>
+      </form>
+
+      <div class="result-block" id="result-route" hidden>
+        <div class="headline">
+          <div class="n"><span id="route-fuel">-</span><sup>kg</sup></div>
+          <p class="sub" id="route-header"></p>
+        </div>
+        <div class="data-list">
+          <div class="data-row"><span class="k">CO&#8322; emissions</span><span class="v" id="route-co2">-</span></div>
+          <div class="data-row"><span class="k">Distance</span><span class="v" id="route-distance">-</span></div>
+          <div class="data-row"><span class="k">Estimated duration</span><span class="v" id="route-duration">-</span></div>
+          <div class="data-row"><span class="k">Confidence</span><span class="v accent" id="route-confidence">-</span></div>
+          <div class="data-row"><span class="k">Model RMSE</span><span class="v" id="route-rmse">-</span></div>
+        </div>
+        <p class="warning" id="route-warning" hidden></p>
+        <details class="more">
+          <summary>Full emissions breakdown</summary>
+          <div id="route-emissions-breakdown"></div>
+        </details>
       </div>
     </section>
 
     <!-- Advanced estimate (manual distance/duration) -->
     <section class="card hidden" id="tab-estimate">
-      <div class="card-head">
-        <h2>Advanced Estimate</h2>
-        <p>Manually enter distance and optional parameters.</p>
-      </div>
-      <div class="split">
-        <form id="form-estimate">
-          <label>Aircraft Type (ICAO code)
-            <input type="text" name="aircraft_type" placeholder="e.g. A320, A339, E190" required />
-          </label>
-          <label>Distance (km)
-            <input type="number" name="distance_km" placeholder="e.g. 1500" min="1" step="1" required />
-          </label>
-          <label>Flight Duration (minutes) <span class="optional">optional</span>
-            <input type="number" name="flight_duration_min" placeholder="e.g. 180" min="1" step="1" />
-          </label>
-          <label>Cruise Altitude (ft) <span class="optional">optional</span>
-            <input type="number" name="cruise_altitude_ft" placeholder="e.g. 35000" min="1000" step="100" />
-          </label>
-          <button type="submit">Estimate Fuel Burn</button>
-        </form>
+      <h2>Advanced estimate</h2>
+      <p class="lead">Manually enter distance and optional parameters.</p>
 
-        <div class="result-panel">
-          <div class="result" id="result-estimate" hidden>
-            <div class="hero-stat">
-              <span class="hero-label">Fuel Burn</span>
-              <span class="hero-value" id="est-fuel">-</span>
-              <span class="hero-unit">kg</span>
-            </div>
-            <div class="chip-row">
-              <div class="chip"><span class="chip-label">CO&#8322;</span><span class="chip-value" id="est-co2">-</span><span class="chip-unit">kg</span></div>
-              <div class="chip"><span class="chip-label">Method</span><span class="chip-value" id="est-method">-</span></div>
-              <div class="chip"><span class="chip-label">Confidence</span><span class="chip-value" id="est-confidence">-</span></div>
-            </div>
-            <div class="warning-box hidden" id="est-warning"></div>
-            <details class="emissions-detail">
-              <summary>Full emissions breakdown</summary>
-              <div id="emissions-breakdown"></div>
-            </details>
+      <form id="form-estimate">
+        <div class="field-group">
+          <div class="field">
+            <label>Aircraft type
+              <input type="text" name="aircraft_type" placeholder="A320" required />
+            </label>
           </div>
-          <div class="result-empty">Fill in the form to see a fuel burn estimate here.</div>
+          <div class="field">
+            <label>Distance (km)
+              <input type="number" name="distance_km" placeholder="1500" min="1" step="1" required />
+            </label>
+          </div>
+          <div class="field">
+            <label>Duration (min) <span class="optional">optional</span>
+              <input type="number" name="flight_duration_min" placeholder="180" min="1" step="1" />
+            </label>
+          </div>
+          <div class="field">
+            <label>Cruise altitude (ft) <span class="optional">optional</span>
+              <input type="number" name="cruise_altitude_ft" placeholder="35000" min="1000" step="100" />
+            </label>
+          </div>
         </div>
+        <button type="submit" class="btn">Estimate</button>
+      </form>
+
+      <div class="result-block" id="result-estimate" hidden>
+        <div class="headline">
+          <div class="n"><span id="est-fuel">-</span><sup>kg</sup></div>
+        </div>
+        <div class="data-list">
+          <div class="data-row"><span class="k">CO&#8322; emissions</span><span class="v" id="est-co2">-</span></div>
+          <div class="data-row"><span class="k">Method</span><span class="v" id="est-method">-</span></div>
+          <div class="data-row"><span class="k">Confidence</span><span class="v accent" id="est-confidence">-</span></div>
+        </div>
+        <p class="warning" id="est-warning" hidden></p>
+        <details class="more">
+          <summary>Full emissions breakdown</summary>
+          <div id="emissions-breakdown"></div>
+        </details>
       </div>
     </section>
 
     <!-- Batch estimate -->
     <section class="card hidden" id="tab-batch">
-      <div class="card-head">
-        <h2>Batch Estimate</h2>
-        <p>Paste a JSON array of flights.</p>
-      </div>
+      <h2>Batch estimate</h2>
+      <p class="lead">Paste a JSON array of flights.</p>
+
       <form id="form-batch">
         <label>Flights (JSON)
-          <textarea name="flights" rows="8" placeholder='[{"aircraft_type":"A320","distance_km":1500},{"aircraft_type":"E190","distance_km":800}]'></textarea>
+          <textarea name="flights" rows="7" placeholder='[{"aircraft_type":"A320","distance_km":1500},{"aircraft_type":"E190","distance_km":800}]'></textarea>
         </label>
-        <button type="submit">Estimate Batch</button>
+        <button type="submit" class="btn">Estimate batch</button>
       </form>
+
       <div id="result-batch" hidden>
-        <p class="section-label">Results</p>
         <table id="batch-table">
           <thead><tr></tr></thead>
           <tbody></tbody>
@@ -160,92 +152,64 @@
 
     <!-- Train model -->
     <section class="card hidden" id="tab-train">
-      <div class="card-head">
-        <h2>Train Model</h2>
-        <p>New files are automatically added to everything trained before — so uploading February's data keeps January's too.</p>
-      </div>
+      <h2>Train model</h2>
+      <p class="lead">New files are added to everything trained before — uploading February's data keeps January's too.</p>
 
       <form id="form-train-upload">
-        <label class="dropzone">
-          <span class="dropzone-text">
-            <strong>Click to choose CSV file(s)</strong>
-            <span>Select more than one to combine them into a single training run</span>
-          </span>
+        <label>Upload CSV file(s)
           <input type="file" name="file" accept=".csv" multiple required />
         </label>
-        <label class="checkbox-label">
+        <label class="checkbox">
           <input type="checkbox" name="replace" />
-          Start fresh (discard all previously trained data, use only this upload)
+          <span>Start fresh — discard previous data, use only this upload</span>
         </label>
-        <button type="submit">Upload &amp; Train</button>
+        <button type="submit" class="btn">Upload &amp; train</button>
       </form>
 
       <p class="divider">or train from a server path</p>
 
       <form id="form-train">
-        <label>CSV File Path(s) on the server <span class="optional">comma-separated for multiple</span>
-          <input type="text" name="csv_path" placeholder="e.g. flights_jan.csv, flights_feb.csv" />
+        <label>CSV path(s) on the server <span class="optional">comma-separated for multiple</span>
+          <input type="text" name="csv_path" placeholder="flights_jan.csv, flights_feb.csv" />
         </label>
-        <label class="checkbox-label">
+        <label class="checkbox">
           <input type="checkbox" name="replace" />
-          Start fresh (discard all previously trained data, use only this path)
+          <span>Start fresh — discard previous data, use only this path</span>
         </label>
-        <button type="submit">Train from Path</button>
+        <button type="submit" class="btn">Train from path</button>
       </form>
 
-      <div class="result" id="result-train" hidden>
-        <p class="section-label">Training Output</p>
+      <div class="result-block" id="result-train" hidden>
+        <p class="section-label">Training output</p>
         <pre id="train-output"></pre>
       </div>
     </section>
 
     <!-- Aircraft families -->
     <section class="card hidden" id="tab-families">
-      <div class="card-head">
-        <h2>Trained Aircraft Families</h2>
-        <p>What the model has learned so far, and which factors matter most for each aircraft.</p>
-      </div>
-      <button id="btn-load-families">Load Families</button>
+      <h2>Trained aircraft families</h2>
+      <p class="lead">What the model has learned so far, and which factors matter most.</p>
+      <button id="btn-load-families" class="btn">Load families</button>
 
-      <div class="result" id="result-summary" hidden>
-        <p class="section-label">Training Summary</p>
-        <div class="result-grid">
-          <div class="result-item">
-            <span class="label">Trained At</span>
-            <span class="value" id="sum-trained-at">-</span>
-          </div>
-          <div class="result-item">
-            <span class="label">Source File(s)</span>
-            <span class="value small" id="sum-trained-from">-</span>
-          </div>
-          <div class="result-item">
-            <span class="label">Total Flights</span>
-            <span class="value" id="sum-total">-</span>
-          </div>
-          <div class="result-item primary">
-            <span class="label">Holdout MAPE</span>
-            <span class="value" id="sum-mape">-</span>
-            <span class="unit">%</span>
-          </div>
-          <div class="result-item">
-            <span class="label">R&#178;</span>
-            <span class="value" id="sum-r2">-</span>
-          </div>
-          <div class="result-item">
-            <span class="label">Holdout RMSE</span>
-            <span class="value" id="sum-rmse">-</span>
-            <span class="unit">kg</span>
-          </div>
+      <div class="result-block" id="result-summary" hidden>
+        <p class="section-label">Training summary</p>
+        <div class="data-list">
+          <div class="data-row"><span class="k">Trained at</span><span class="v" id="sum-trained-at">-</span></div>
+          <div class="data-row"><span class="k">Source file(s)</span><span class="v small" id="sum-trained-from">-</span></div>
+          <div class="data-row"><span class="k">Total flights</span><span class="v" id="sum-total">-</span></div>
+          <div class="data-row"><span class="k">Holdout MAPE</span><span class="v accent" id="sum-mape">-</span></div>
+          <div class="data-row"><span class="k">R&#178;</span><span class="v" id="sum-r2">-</span></div>
+          <div class="data-row"><span class="k">Holdout RMSE</span><span class="v" id="sum-rmse">-</span></div>
         </div>
       </div>
 
-      <div id="result-families" hidden>
-        <p class="section-label">Per-Aircraft Detail</p>
-        <div class="family-grid" id="family-grid"></div>
+      <div class="fam-section" id="result-families" hidden>
+        <p class="section-label">Per-aircraft detail</p>
+        <div class="fam-list" id="family-grid"></div>
       </div>
     </section>
 
-    <div class="error-box hidden" id="error-box"></div>
+    <p class="error hidden" id="error-box"></p>
   </div>
 
   <script src="script.js"></script>

@@ -45,15 +45,15 @@ async function checkStatus() {
       const trainedNote = data.trained_at
         ? ` — trained ${new Date(data.trained_at).toLocaleString()} from ${fromNames}`
         : "";
-      badge.textContent = `Model trained (${data.families_available.length} families: ${data.families_available.join(", ")})${trainedNote}`;
-      badge.className = "status-badge status-trained";
+      badge.textContent = `Model trained — ${data.families_available.length} aircraft types${trainedNote}`;
+      badge.className = "status status-trained";
     } else {
       badge.textContent = "Model not trained — go to Train Model tab";
-      badge.className = "status-badge status-untrained";
+      badge.className = "status status-untrained";
     }
   } catch {
     document.getElementById("model-status").textContent = "API offline — start the server with: python api/app.py";
-    document.getElementById("model-status").className = "status-badge status-untrained";
+    document.getElementById("model-status").className = "status status-untrained";
   }
 }
 checkStatus();
@@ -75,23 +75,19 @@ document.getElementById("form-route").addEventListener("submit", async (e) => {
   try {
     const data = await api("/estimate/route", { method: "POST", body: JSON.stringify(body) });
 
-    // Route header
-    document.getElementById("route-header").innerHTML =
-      `<span class="route-label">${data.route.departure}</span>` +
-      `<span class="route-arrow">→</span>` +
-      `<span class="route-label">${data.route.arrival}</span>` +
-      `<span class="route-aircraft">${data.aircraft_family}</span>`;
+    document.getElementById("route-header").textContent =
+      `${data.route.departure} → ${data.route.arrival} · ${data.aircraft_family}`;
 
     document.getElementById("route-fuel").textContent = formatNum(data.fuel_burn_kg);
-    document.getElementById("route-co2").textContent = formatNum(data.emissions.co2);
-    document.getElementById("route-distance").textContent = formatNum(data.route.distance_km);
-    document.getElementById("route-duration").textContent = formatNum(Math.round(data.route.estimated_duration_min));
+    document.getElementById("route-co2").textContent = `${formatNum(data.emissions.co2)} kg`;
+    document.getElementById("route-distance").textContent = `${formatNum(data.route.distance_km)} km`;
+    document.getElementById("route-duration").textContent = `${formatNum(Math.round(data.route.estimated_duration_min))} min`;
     document.getElementById("route-confidence").textContent = data.confidence;
-    document.getElementById("route-rmse").textContent = data.model_rmse_kg || "N/A";
+    document.getElementById("route-rmse").textContent = data.model_rmse_kg ? `${formatNum(data.model_rmse_kg)} kg` : "N/A";
 
     const routeWarning = document.getElementById("route-warning");
     if (data.warning) {
-      routeWarning.textContent = `⚠ ${data.warning}`;
+      routeWarning.textContent = data.warning;
       routeWarning.hidden = false;
     } else {
       routeWarning.hidden = true;
@@ -128,13 +124,13 @@ document.getElementById("form-estimate").addEventListener("submit", async (e) =>
   try {
     const data = await api("/estimate", { method: "POST", body: JSON.stringify(body) });
     document.getElementById("est-fuel").textContent = formatNum(data.fuel_burn_kg);
-    document.getElementById("est-co2").textContent = formatNum(data.emissions.co2);
+    document.getElementById("est-co2").textContent = `${formatNum(data.emissions.co2)} kg`;
     document.getElementById("est-method").textContent = data.method;
     document.getElementById("est-confidence").textContent = data.confidence;
 
     const estWarning = document.getElementById("est-warning");
     if (data.warning) {
-      estWarning.textContent = `⚠ ${data.warning}`;
+      estWarning.textContent = data.warning;
       estWarning.hidden = false;
     } else {
       estWarning.hidden = true;
@@ -257,7 +253,7 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
     document.getElementById("sum-rmse").textContent = overall ? formatNum(overall.rmse_kg) : "N/A";
     document.getElementById("result-summary").hidden = false;
 
-    // Per-family cards, with top 3 most important factors for each aircraft
+    // Per-family rows, with top 3 most important factors for each aircraft
     document.getElementById("family-grid").innerHTML = Object.entries(families)
       .map(([fam, info]) => {
         const topFactors = Object.entries(info.feature_importance || {})
@@ -266,13 +262,10 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
           .map(([name]) => name.replace(/_/g, " "))
           .join(" · ");
         return `
-          <div class="family-card">
-            <div class="family-card-head">
-              <span class="family-name">${fam}</span>
-              <span class="family-flights">${formatNum(info.n_training_flights)} flights</span>
-            </div>
-            <div class="family-rmse">RMSE ${formatNum(info.rmse_kg)} kg</div>
-            <div class="family-factors">${topFactors}</div>
+          <div class="fam-row">
+            <span class="f-name">${fam}</span>
+            <span class="f-factors">${topFactors}</span>
+            <span class="f-meta">${formatNum(info.n_training_flights)} flights · RMSE ${formatNum(info.rmse_kg)} kg</span>
           </div>`;
       })
       .join("");
