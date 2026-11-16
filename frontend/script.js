@@ -351,14 +351,45 @@ document.getElementById("form-train-upload").addEventListener("submit", async (e
 });
 
 // ============================================================
-// Load families
+// Model accuracy
 // ============================================================
+
+// Plain-language labels for the raw feature names the model trains on.
+const FACTOR_LABELS = {
+  distance_km: "Flight distance",
+  flight_duration_min: "Flight duration",
+  airborne_duration_min: "Time in the air",
+  taxi_time_min: "Taxi time",
+  cruise_altitude_ft: "Cruising altitude",
+  average_speed_kts: "Average speed",
+  payload_kg: "Passenger & cargo weight",
+  headwind_kts: "Wind",
+  temperature_c: "Outside temperature",
+  takeoff_weight_kg: "Takeoff weight",
+  passengers: "Passenger count",
+  cargo_kg: "Cargo weight",
+};
+function friendlyFactor(name) {
+  return FACTOR_LABELS[name] || name.replace(/_/g, " ");
+}
+
+// Translate MAPE (average % error on unseen flights) into a plain rating,
+// since "MAPE" on its own means nothing to most users.
+function accuracyRating(mapePct) {
+  if (mapePct == null || isNaN(mapePct)) return { label: "Not yet measured", cls: "unknown" };
+  if (mapePct <= 3) return { label: "Excellent", cls: "excellent" };
+  if (mapePct <= 6) return { label: "Good", cls: "good" };
+  if (mapePct <= 10) return { label: "Fair", cls: "fair" };
+  return { label: "Needs more data", cls: "poor" };
+}
+
 document.getElementById("btn-load-families").addEventListener("click", async () => {
   hideError();
   const btn = document.getElementById("btn-load-families");
   setBusy(btn, "Loading...", "Refresh");
   try {
     const [families, summary] = await Promise.all([api("/families"), api("/model/summary")]);
+    const perFamily = (summary.holdout_validation && summary.holdout_validation.per_family) || {};
 
     // Training summary (persists across restarts, unlike the one-time /train response)
     document.getElementById("sum-trained-at").textContent = summary.trained_at
@@ -369,27 +400,42 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
     document.getElementById("sum-total").textContent = formatNum(summary.total_flights);
     const overall = summary.holdout_validation && summary.holdout_validation.overall;
     document.getElementById("sum-mape").textContent = overall ? `${overall.mape_pct}%` : "N/A";
-    document.getElementById("sum-r2").textContent = overall ? overall.r_squared : "N/A";
+    document.getElementById("sum-r2").textContent = overall ? `${(overall.r_squared * 100).toFixed(1)}%` : "N/A";
     document.getElementById("sum-rmse").textContent = overall ? `${formatNum(overall.rmse_kg)} kg` : "N/A";
     document.getElementById("result-summary").hidden = false;
 
-    // Per-family table rows, with an inline bar (relative to the worst
-    // family's RMSE) so accuracy differences are visible at a glance,
-    // plus the top 3 most important factors for each aircraft.
-    const maxRmse = Math.max(...Object.values(families).map((info) => info.rmse_kg || 0));
+    // One card per aircraft type: a plain-language accuracy rating instead
+    // of a bare MAPE number, flight count, and the top factors driving its
+    // fuel burn as readable tags instead of raw snake_case feature names.
     document.getElementById("family-grid").innerHTML = Object.entries(families)
+      .sort(([a], [b]) => a.localeCompare(b))
       .map(([fam, info]) => {
+        const famStats = perFamily[fam];
+        const rating = accuracyRating(famStats ? famStats.mape_pct : null);
+        const errorText = famStats
+          ? `~${famStats.mape_pct}% typical error`
+          : `~${formatNum(info.rmse_kg)} kg typical error`;
+
         const topFactors = Object.entries(info.feature_importance || {})
           .sort((a, b) => b[1] - a[1])
           .slice(0, 3)
-          .map(([name]) => name.replace(/_/g, " "))
-          .join(", ");
-        const pct = maxRmse > 0 ? Math.max((info.rmse_kg / maxRmse) * 100, 2) : 0;
-        const rmseCell = `<span class="bar-cell">
-          <span class="bar-track"><span class="bar-fill" style="width:${pct}%"></span></span>
-          <span class="bar-number">${formatNum(info.rmse_kg)}</span>
-        </span>`;
-        return `<tr><td><strong>${fam}</strong></td><td>${rmseCell}</td><td>${formatNum(info.n_training_flights)}</td><td>${topFactors}</td></tr>`;
+          .map(([name]) => `<span class="factor-tag">${friendlyFactor(name)}</span>`)
+          .join("");
+
+        return `<div class="accuracy-card ${rating.cls}">
+          <div class="accuracy-card-header">
+            <span class="accuracy-card-title">${fam}</span>
+            <span class="accuracy-badge ${rating.cls}">${rating.label}</span>
+          </div>
+          <div class="accuracy-card-metrics">
+            <span>${formatNum(info.n_training_flights)} flights trained on</span>
+            <span>${errorText}</span>
+          </div>
+          <div class="accuracy-card-factors">
+            <span class="factor-label">What matters most for this aircraft:</span>
+            <div class="factor-tags">${topFactors || '<span class="text-muted small">Not enough data yet</span>'}</div>
+          </div>
+        </div>`;
       })
       .join("");
     document.getElementById("result-families").hidden = false;

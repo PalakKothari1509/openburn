@@ -277,25 +277,31 @@
 
               <div id="result-summary" hidden>
                 <div class="hr-line-dashed"></div>
-                <p class="text-muted small" style="margin-bottom: 0.6rem;">Overall, across all aircraft types:</p>
-                <div class="summary-line">
-                  <span><strong id="sum-total">-</strong> flights trained on</span>
-                  <span title="Average error, as a percentage, on flights the model did not see while training">MAPE (avg. error) <strong id="sum-mape">-</strong></span>
-                  <span title="How much of the variation in fuel burn the model explains — 1.0 is a perfect fit">R&#178; (model fit) <strong id="sum-r2">-</strong></span>
-                  <span title="Root-mean-square error, in kilograms of fuel">RMSE <strong id="sum-rmse">-</strong></span>
+                <div class="stat-grid">
+                  <div class="stat-box stat-box-primary">
+                    <span class="stat-label">Flights Trained On</span>
+                    <span class="stat-value" id="sum-total">-</span>
+                  </div>
+                  <div class="stat-box" title="The usual difference between an estimate and the actual fuel burned, as a percentage, measured on flights the model did not train on">
+                    <span class="stat-label">Typical Error &#9432;</span>
+                    <span class="stat-value" id="sum-mape">-</span>
+                  </div>
+                  <div class="stat-box" title="How much of the difference in fuel burn between flights the model can explain — higher is better">
+                    <span class="stat-label">Consistency &#9432;</span>
+                    <span class="stat-value" id="sum-r2">-</span>
+                  </div>
+                  <div class="stat-box" title="The usual difference between an estimate and the actual fuel burned, in kilograms">
+                    <span class="stat-label">Typical Error (kg) &#9432;</span>
+                    <span class="stat-value" id="sum-rmse">-</span>
+                  </div>
                 </div>
                 <p class="text-muted small">Last trained <span id="sum-trained-at">-</span> from <span id="sum-trained-from">-</span></p>
               </div>
 
-              <div id="result-families" hidden class="table-responsive">
+              <div id="result-families" hidden>
                 <div class="hr-line-dashed"></div>
-                <p class="text-muted small" style="margin-bottom: 0.6rem;">Broken down by aircraft type:</p>
-                <table class="table table-striped table-hover" id="families-table">
-                  <thead>
-                    <tr><th>Aircraft Type</th><th title="Root-mean-square error in kilograms of fuel — how far off a typical prediction is. Lower is better.">Prediction Error (RMSE, kg) &#9432;</th><th>Flights Trained On</th><th title="The 3 flight details that most change this aircraft's fuel estimate — found by testing how much the prediction shifts when each one is varied.">Top Factors &#9432;</th></tr>
-                  </thead>
-                  <tbody id="family-grid"></tbody>
-                </table>
+                <p class="text-muted small" style="margin-bottom: 0.8rem;">Broken down by aircraft type:</p>
+                <div class="accuracy-grid" id="family-grid"></div>
               </div>
             </div>
           </div>
