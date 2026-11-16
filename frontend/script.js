@@ -248,9 +248,9 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
     document.getElementById("sum-trained-from").textContent = summaryFromNames || "-";
     document.getElementById("sum-total").textContent = formatNum(summary.total_flights);
     const overall = summary.holdout_validation && summary.holdout_validation.overall;
-    document.getElementById("sum-mape").textContent = overall ? overall.mape_pct : "N/A";
+    document.getElementById("sum-mape").textContent = overall ? `${overall.mape_pct}%` : "N/A";
     document.getElementById("sum-r2").textContent = overall ? overall.r_squared : "N/A";
-    document.getElementById("sum-rmse").textContent = overall ? formatNum(overall.rmse_kg) : "N/A";
+    document.getElementById("sum-rmse").textContent = overall ? `${formatNum(overall.rmse_kg)} kg` : "N/A";
     document.getElementById("result-summary").hidden = false;
 
     // Per-family table rows, with top 3 most important factors for each aircraft

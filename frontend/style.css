@@ -223,6 +223,16 @@ input[type="file"].form-control { border: none; padding: 0.3rem 0; background: n
 
 .hr-line-dashed { border-top: 1px dashed var(--border); margin: 1.4rem 0; }
 
+.summary-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+.summary-line strong { color: var(--accent-dark); font-weight: 700; }
+
 /* ---------- Stat boxes ---------- */
 
 .stat-grid {
@@ -285,6 +295,8 @@ table.table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .table thead th { color: var(--muted); text-transform: uppercase; font-size: 0.66rem; letter-spacing: 0.03em; border-bottom: 2px solid var(--border); }
 .table-striped tbody tr:nth-child(odd) { background: var(--row-stripe); }
 .table-hover tbody tr:hover { background: var(--accent-soft); }
+
+#families-table td:last-child { white-space: normal; max-width: 220px; color: var(--muted); }
 
 pre {
   background: var(--row-stripe);
