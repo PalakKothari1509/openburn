@@ -56,6 +56,8 @@ def health():
         "status": "ok",
         "model_trained": model._is_trained,
         "families_available": model.performance.families if model._is_trained else [],
+        "trained_at": model._trained_at,
+        "trained_from": model._trained_from,
     })
 
 

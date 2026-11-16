@@ -41,7 +41,10 @@ async function checkStatus() {
     const data = await api("/health");
     const badge = document.getElementById("model-status");
     if (data.model_trained) {
-      badge.textContent = `Model trained (${data.families_available.length} families: ${data.families_available.join(", ")})`;
+      const trainedNote = data.trained_at
+        ? ` — trained ${new Date(data.trained_at).toLocaleString()} from ${data.trained_from}`
+        : "";
+      badge.textContent = `Model trained (${data.families_available.length} families: ${data.families_available.join(", ")})${trainedNote}`;
       badge.className = "status-badge status-trained";
     } else {
       badge.textContent = "Model not trained — go to Train Model tab";

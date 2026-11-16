@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -35,6 +36,8 @@ class FuelBurnModel:
         self._is_trained = False
         self._training_summary: dict = {}
         self._avg_speeds: dict[str, float] = {}  # km/min per aircraft family
+        self._trained_at: Optional[str] = None  # ISO timestamp of last training
+        self._trained_from: Optional[str] = None  # source CSV filename
 
         # Load airport coordinates for distance calculation
         coords_path = Path(airport_coords_path) if airport_coords_path else _DEFAULT_AIRPORT_COORDS
@@ -82,6 +85,8 @@ class FuelBurnModel:
         self._learn_speeds(train_df)
 
         self._is_trained = True
+        self._trained_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        self._trained_from = Path(fuel_csv_path).name
 
         summary = {
             "families_trained": list(profiles.keys()),
@@ -345,6 +350,8 @@ class FuelBurnModel:
             "fallback": self.fallback.get_state(),
             "avg_speeds": self._avg_speeds,
             "training_summary": self._training_summary,
+            "trained_at": self._trained_at,
+            "trained_from": self._trained_from,
         }
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -352,15 +359,23 @@ class FuelBurnModel:
 
     def load_model(self, path: str | Path) -> bool:
         """Load a previously saved model from disk. Returns True if a saved
-        model was found and loaded, False if the path doesn't exist yet."""
+        model was found and loaded, False if the path doesn't exist yet or
+        the saved file is missing/corrupted/from an incompatible version
+        (in which case the server just starts untrained instead of crashing)."""
         path = Path(path)
         if not path.exists():
             return False
-        state = joblib.load(path)
-        self.performance.set_state(state["performance"])
-        self.fallback.set_state(state["fallback"])
-        self._avg_speeds = state.get("avg_speeds", {})
-        self._training_summary = state.get("training_summary", {})
+        try:
+            state = joblib.load(path)
+            self.performance.set_state(state["performance"])
+            self.fallback.set_state(state["fallback"])
+            self._avg_speeds = state.get("avg_speeds", {})
+            self._training_summary = state.get("training_summary", {})
+            self._trained_at = state.get("trained_at")
+            self._trained_from = state.get("trained_from")
+        except Exception as e:
+            print(f"Could not load saved model at {path} ({e}) — starting untrained.")
+            return False
         self._is_trained = True
         return True
 
