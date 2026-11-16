@@ -257,16 +257,23 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
     document.getElementById("sum-rmse").textContent = overall ? formatNum(overall.rmse_kg) : "N/A";
     document.getElementById("result-summary").hidden = false;
 
-    // Per-family table, with top 3 most important factors for each aircraft
-    const tbody = document.getElementById("families-table").querySelector("tbody");
-    tbody.innerHTML = Object.entries(families)
+    // Per-family cards, with top 3 most important factors for each aircraft
+    document.getElementById("family-grid").innerHTML = Object.entries(families)
       .map(([fam, info]) => {
         const topFactors = Object.entries(info.feature_importance || {})
           .sort((a, b) => b[1] - a[1])
           .slice(0, 3)
-          .map(([name]) => name)
-          .join(", ");
-        return `<tr><td>${fam}</td><td>${formatNum(info.rmse_kg)}</td><td>${formatNum(info.n_training_flights)}</td><td>${topFactors}</td></tr>`;
+          .map(([name]) => name.replace(/_/g, " "))
+          .join(" · ");
+        return `
+          <div class="family-card">
+            <div class="family-card-head">
+              <span class="family-name">${fam}</span>
+              <span class="family-flights">${formatNum(info.n_training_flights)} flights</span>
+            </div>
+            <div class="family-rmse">RMSE ${formatNum(info.rmse_kg)} kg</div>
+            <div class="family-factors">${topFactors}</div>
+          </div>`;
       })
       .join("");
     document.getElementById("result-families").hidden = false;
