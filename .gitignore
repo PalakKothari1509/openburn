@@ -13,6 +13,7 @@ env/
 !data/sample_*.csv
 !data/airport_coords.csv
 data/trained_model.joblib
+model_summary.json
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

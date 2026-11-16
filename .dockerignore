@@ -1,0 +1,16 @@
+.git
+.gitignore
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.claude
+__pycache__
+*.pyc
+*.egg-info
+*.csv
+!data/sample_*.csv
+!data/airport_coords.csv
+data/trained_model.joblib
+data/training_history
+tests
+HOW_IT_WORKS.md

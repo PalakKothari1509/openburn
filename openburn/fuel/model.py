@@ -457,6 +457,24 @@ class FuelBurnModel:
         self._is_trained = True
         return True
 
+    def save_summary(self, path: str) -> None:
+        """Save model summary to JSON."""
+        summary = {
+            "families": self.performance.families,
+            "profiles": {},
+        }
+        for family in self.performance.families:
+            profile = self.performance.get_profile(family)
+            if profile:
+                summary["profiles"][family] = {
+                    "rmse_cv_kg": profile.rmse_cv,
+                    "n_training_flights": profile.n_training_flights,
+                    "features": profile.feature_names,
+                }
+        if self._training_summary.get("holdout_validation"):
+            summary["holdout_validation"] = self._training_summary["holdout_validation"]
+        Path(path).write_text(json.dumps(summary, indent=2))
+
 
 def _fit_duration_model(group: pd.DataFrame) -> tuple[float, float]:
     """Fit duration_min = overhead + rate * distance_km via linear
@@ -475,21 +493,3 @@ def _fit_duration_model(group: pd.DataFrame) -> tuple[float, float]:
 
     speed = (group["distance_km"] / group["flight_duration_min"]).median()
     return (25.0, 1.0 / speed) if speed > 0 else (25.0, 1.0 / 8.0)
-
-    def save_summary(self, path: str) -> None:
-        """Save model summary to JSON."""
-        summary = {
-            "families": self.performance.families,
-            "profiles": {},
-        }
-        for family in self.performance.families:
-            profile = self.performance.get_profile(family)
-            if profile:
-                summary["profiles"][family] = {
-                    "rmse_cv_kg": profile.rmse_cv,
-                    "n_training_flights": profile.n_training_flights,
-                    "features": profile.feature_names,
-                }
-        if self._training_summary.get("holdout_validation"):
-            summary["holdout_validation"] = self._training_summary["holdout_validation"]
-        Path(path).write_text(json.dumps(summary, indent=2))

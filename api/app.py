@@ -96,7 +96,7 @@ def train():
     or:        {"csv_paths": ["/path/jan.csv", "/path/feb.csv"]} to combine several
     optional:  "replace": true
     """
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     csv_paths = data.get("csv_paths")
     if not csv_paths and data.get("csv_path"):
         csv_paths = [data["csv_path"]]
@@ -164,7 +164,7 @@ def estimate():
         "average_speed_kts": 450        // optional
     }
     """
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
     required = ["aircraft_type", "distance_km"]
     missing = [f for f in required if f not in data]
@@ -198,7 +198,7 @@ def estimate_batch():
     """
     import pandas as pd
 
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     flights = data.get("flights", [])
     if not flights:
         return jsonify({"error": "No flights provided"}), 400
@@ -228,7 +228,7 @@ def estimate_route():
         "passengers": 150           // optional
     }
     """
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
     required = ["departure", "arrival", "aircraft_type"]
     missing = [f for f in required if f not in data]
@@ -279,7 +279,7 @@ def data_summary():
 
     POST body: {"csv_path": "/path/to/fuel_data.csv"}
     """
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     csv_path = data.get("csv_path")
     if not csv_path:
         return jsonify({"error": "csv_path is required"}), 400
