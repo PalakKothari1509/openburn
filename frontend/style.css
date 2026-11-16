@@ -19,6 +19,7 @@
   --warning: #f8ac59;
   --warning-soft: #fef5e9;
   --info: #1c84c6;
+  --info-soft: #eaf3fa;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -293,6 +294,7 @@ input[type="file"].form-control { border: none; padding: 0.3rem 0; background: n
 .alert { padding: 0.75rem 1rem; border-radius: 3px; font-size: 0.82rem; margin-top: 0.9rem; }
 .alert-warning { background: var(--warning-soft); border: 1px solid var(--warning); color: #a06a1a; }
 .alert-danger { background: var(--danger-soft); border: 1px solid var(--danger); color: #b53045; }
+.alert-info { background: var(--info-soft); border: 1px solid var(--info); color: #12587f; }
 
 /* ---------- Details / emissions breakdown ---------- */
 
@@ -351,6 +353,17 @@ table.table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .table-hover tbody tr:hover { background: var(--accent-soft); }
 
 /* ---------- Model accuracy cards ---------- */
+
+.accuracy-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.25rem;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+.accuracy-legend-item { display: inline-flex; align-items: center; gap: 0.45rem; }
 
 .accuracy-grid {
   display: grid;

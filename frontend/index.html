@@ -275,6 +275,10 @@
               <p class="ibox-lead">A report card for the trained model — accuracy per aircraft type, and what drives each one's fuel burn.</p>
               <button id="btn-load-families" class="btn btn-primary">Refresh</button>
 
+              <div id="families-untrained" class="alert alert-info" hidden>
+                No model trained yet — go to the <strong>Train the Model</strong> tab first, then come back here to see how accurate it is.
+              </div>
+
               <div id="result-summary" hidden>
                 <div class="hr-line-dashed"></div>
                 <div class="stat-grid">
@@ -295,11 +299,21 @@
                     <span class="stat-value" id="sum-rmse">-</span>
                   </div>
                 </div>
+                <p class="text-muted small">
+                  Typical Error is how far off a prediction usually is. Consistency is how
+                  reliably the model explains differences between flights — closer to 100% is better.
+                </p>
                 <p class="text-muted small">Last trained <span id="sum-trained-at">-</span> from <span id="sum-trained-from">-</span></p>
               </div>
 
               <div id="result-families" hidden>
                 <div class="hr-line-dashed"></div>
+                <div class="accuracy-legend">
+                  <span class="accuracy-legend-item"><span class="accuracy-badge excellent">Excellent</span> ≤3% error</span>
+                  <span class="accuracy-legend-item"><span class="accuracy-badge good">Good</span> ≤6%</span>
+                  <span class="accuracy-legend-item"><span class="accuracy-badge fair">Fair</span> ≤10%</span>
+                  <span class="accuracy-legend-item"><span class="accuracy-badge poor">Needs more data</span> &gt;10%</span>
+                </div>
                 <p class="text-muted small" style="margin-bottom: 0.8rem;">Broken down by aircraft type:</p>
                 <div class="accuracy-grid" id="family-grid"></div>
               </div>

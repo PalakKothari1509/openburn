@@ -2,6 +2,7 @@ const API_BASE = window.location.origin;
 
 // Tab switching
 let familiesLoaded = false;
+let modelTrained = false;
 document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
@@ -10,10 +11,24 @@ document.querySelectorAll(".tab").forEach((btn) => {
     document.getElementById(`tab-${btn.dataset.tab}`).classList.remove("hidden");
     hideError();
     if (btn.dataset.tab === "families" && !familiesLoaded) {
-      document.getElementById("btn-load-families").click();
+      if (modelTrained) {
+        document.getElementById("btn-load-families").click();
+      } else {
+        document.getElementById("families-untrained").hidden = false;
+      }
     }
   });
 });
+
+// Showing "X training files" instead of a raw, often long/ugly filename
+// (or filenames) when there's more than one; the full list is still
+// available on hover for anyone who wants it.
+function formatTrainedFrom(names) {
+  const arr = Array.isArray(names) ? names : names ? [names] : [];
+  if (arr.length === 0) return { text: "-", title: "" };
+  if (arr.length === 1) return { text: arr[0], title: "" };
+  return { text: `${arr.length} training files`, title: arr.join(", ") };
+}
 
 // Toggle a submit button into/out of a "working" state so slow requests
 // (and accidental double-submits) give visible feedback.
@@ -78,19 +93,23 @@ async function checkStatus() {
   try {
     const data = await api("/health");
     const badge = document.getElementById("model-status");
+    modelTrained = data.model_trained;
     if (data.model_trained) {
-      const fromNames = Array.isArray(data.trained_from) ? data.trained_from.join(", ") : data.trained_from;
+      const from = formatTrainedFrom(data.trained_from);
       const trainedNote = data.trained_at
-        ? ` — trained ${new Date(data.trained_at).toLocaleString()} from ${fromNames}`
+        ? ` — trained ${new Date(data.trained_at).toLocaleString()} from ${from.text}`
         : "";
       badge.textContent = `Model trained — ${data.families_available.length} aircraft types${trainedNote}`;
+      badge.title = from.title;
       badge.className = "label label-primary";
+      document.getElementById("families-untrained").hidden = true;
     } else {
       badge.textContent = "Model not trained — go to the \"Train the Model\" tab";
       badge.className = "label label-warning";
     }
     populateAircraftSelect(data.model_trained ? data.families_available : []);
   } catch {
+    modelTrained = false;
     document.getElementById("model-status").textContent = "API offline — start the server with: python api/app.py";
     document.getElementById("model-status").className = "label label-danger";
     populateAircraftSelect([]);
@@ -383,8 +402,19 @@ function accuracyRating(mapePct) {
   return { label: "Needs more data", cls: "poor" };
 }
 
+// Worst-accuracy-first, so the aircraft that actually need attention
+// surface before the ones that are already doing fine.
+const RATING_SEVERITY = { poor: 0, unknown: 1, fair: 2, good: 3, excellent: 4 };
+
 document.getElementById("btn-load-families").addEventListener("click", async () => {
   hideError();
+  if (!modelTrained) {
+    document.getElementById("families-untrained").hidden = false;
+    document.getElementById("result-summary").hidden = true;
+    document.getElementById("result-families").hidden = true;
+    return;
+  }
+  document.getElementById("families-untrained").hidden = true;
   const btn = document.getElementById("btn-load-families");
   setBusy(btn, "Loading...", "Refresh");
   try {
@@ -395,8 +425,10 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
     document.getElementById("sum-trained-at").textContent = summary.trained_at
       ? new Date(summary.trained_at).toLocaleString()
       : "-";
-    const summaryFromNames = Array.isArray(summary.trained_from) ? summary.trained_from.join(", ") : summary.trained_from;
-    document.getElementById("sum-trained-from").textContent = summaryFromNames || "-";
+    const from = formatTrainedFrom(summary.trained_from);
+    const fromEl = document.getElementById("sum-trained-from");
+    fromEl.textContent = from.text;
+    fromEl.title = from.title;
     document.getElementById("sum-total").textContent = formatNum(summary.total_flights);
     const overall = summary.holdout_validation && summary.holdout_validation.overall;
     document.getElementById("sum-mape").textContent = overall ? `${overall.mape_pct}%` : "N/A";
@@ -407,11 +439,21 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
     // One card per aircraft type: a plain-language accuracy rating instead
     // of a bare MAPE number, flight count, and the top factors driving its
     // fuel burn as readable tags instead of raw snake_case feature names.
+    // Sorted so aircraft needing attention show up first.
     document.getElementById("family-grid").innerHTML = Object.entries(families)
-      .sort(([a], [b]) => a.localeCompare(b))
       .map(([fam, info]) => {
         const famStats = perFamily[fam];
         const rating = accuracyRating(famStats ? famStats.mape_pct : null);
+        return { fam, info, famStats, rating };
+      })
+      .sort((a, b) => {
+        const severity = RATING_SEVERITY[a.rating.cls] - RATING_SEVERITY[b.rating.cls];
+        if (severity !== 0) return severity;
+        const aMape = a.famStats ? a.famStats.mape_pct : -Infinity;
+        const bMape = b.famStats ? b.famStats.mape_pct : -Infinity;
+        return bMape - aMape || a.fam.localeCompare(b.fam);
+      })
+      .map(({ fam, info, famStats, rating }) => {
         const errorText = famStats
           ? `~${famStats.mape_pct}% typical error`
           : `~${formatNum(info.rmse_kg)} kg typical error`;
