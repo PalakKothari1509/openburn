@@ -78,6 +78,11 @@ class FallbackEstimator:
                     "n_flights": len(group),
                 }
 
+    def reset(self) -> None:
+        """Clear learned rates — call before a fresh training run."""
+        self._rates = {}
+        self._global_rate = None
+
     def get_state(self) -> dict:
         """Return picklable state for model persistence."""
         return {"rates": self._rates, "global_rate": self._global_rate}

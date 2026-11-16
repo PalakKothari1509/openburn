@@ -41,8 +41,9 @@ async function checkStatus() {
     const data = await api("/health");
     const badge = document.getElementById("model-status");
     if (data.model_trained) {
+      const fromNames = Array.isArray(data.trained_from) ? data.trained_from.join(", ") : data.trained_from;
       const trainedNote = data.trained_at
-        ? ` — trained ${new Date(data.trained_at).toLocaleString()} from ${data.trained_from}`
+        ? ` — trained ${new Date(data.trained_at).toLocaleString()} from ${fromNames}`
         : "";
       badge.textContent = `Model trained (${data.families_available.length} families: ${data.families_available.join(", ")})${trainedNote}`;
       badge.className = "status-badge status-trained";
@@ -192,9 +193,10 @@ document.getElementById("form-train").addEventListener("submit", async (e) => {
   btn.textContent = "Training...";
   btn.disabled = true;
   try {
+    const csvPaths = fd.get("csv_path").split(",").map((p) => p.trim()).filter(Boolean);
     const data = await api("/train", {
       method: "POST",
-      body: JSON.stringify({ csv_path: fd.get("csv_path") }),
+      body: JSON.stringify({ csv_paths: csvPaths }),
     });
     document.getElementById("train-output").textContent = JSON.stringify(data, null, 2);
     document.getElementById("result-train").hidden = false;
@@ -246,7 +248,8 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
     document.getElementById("sum-trained-at").textContent = summary.trained_at
       ? new Date(summary.trained_at).toLocaleString()
       : "-";
-    document.getElementById("sum-trained-from").textContent = summary.trained_from || "-";
+    const summaryFromNames = Array.isArray(summary.trained_from) ? summary.trained_from.join(", ") : summary.trained_from;
+    document.getElementById("sum-trained-from").textContent = summaryFromNames || "-";
     document.getElementById("sum-total").textContent = formatNum(summary.total_flights);
     const overall = summary.holdout_validation && summary.holdout_validation.overall;
     document.getElementById("sum-mape").textContent = overall ? overall.mape_pct : "N/A";

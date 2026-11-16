@@ -40,7 +40,7 @@ class FuelBurnModel:
         self._training_summary: dict = {}
         self._avg_speeds: dict[str, float] = {}  # km/min per aircraft family
         self._trained_at: Optional[str] = None  # ISO timestamp of last training
-        self._trained_from: Optional[str] = None  # source CSV filename
+        self._trained_from: Optional[list[str]] = None  # source CSV filename(s)
 
         # Load airport coordinates for distance calculation
         coords_path = Path(airport_coords_path) if airport_coords_path else _DEFAULT_AIRPORT_COORDS
@@ -55,24 +55,44 @@ class FuelBurnModel:
 
     def train_from_csv(
         self,
-        fuel_csv_path: str,
+        fuel_csv_path: str | Path | list[str | Path],
         test_size: float = 0.2,
         random_state: int = 42,
+        source_names: Optional[list[str]] = None,
         **kwargs,
     ) -> dict:
-        """Train the model from a CSV of historical fuel burn data.
+        """Train the model from one or more CSVs of historical fuel burn data.
+
+        Multiple files are concatenated into a single dataset before
+        cleaning/training, so e.g. several months of data can be combined
+        into one model instead of each call only seeing one file.
 
         Args:
-            fuel_csv_path: Path to CSV with flight records and fuel burn.
+            fuel_csv_path: Path (or list of paths) to CSV(s) with flight
+                records and fuel burn.
             test_size: Fraction of data to hold out for validation (0-1).
                 Set to 0 to train on all data (no validation).
             random_state: Random seed for reproducibility.
+            source_names: Optional display names for the source file(s),
+                used instead of the actual path (e.g. when the path is a
+                temp file from an upload but the original filename is
+                more useful to show).
 
         Returns:
             Training summary with per-family metrics and validation results.
         """
-        df = self.features.load_fuel_csv(fuel_csv_path, **kwargs)
+        paths = [fuel_csv_path] if isinstance(fuel_csv_path, (str, Path)) else list(fuel_csv_path)
+
+        frames = [self.features.load_fuel_csv(str(p), **kwargs) for p in paths]
+        df = pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
         df = self.features.prepare_training_data(df)
+
+        # Start from a clean slate — otherwise aircraft families from a
+        # previous, unrelated training run could silently stick around
+        # even though they're not part of this training data at all.
+        self.performance.reset()
+        self.fallback.reset()
+        self._avg_speeds = {}
 
         validation_results = None
         if test_size > 0 and len(df) > 50:
@@ -95,7 +115,7 @@ class FuelBurnModel:
 
         self._is_trained = True
         self._trained_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        self._trained_from = Path(fuel_csv_path).name
+        self._trained_from = source_names if source_names else [Path(p).name for p in paths]
 
         summary = {
             "families_trained": list(profiles.keys()),

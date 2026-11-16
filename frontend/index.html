@@ -165,10 +165,10 @@
     <!-- Train model -->
     <section class="card hidden" id="tab-train">
       <h2>Train Model</h2>
-      <p>Upload a fuel burn CSV file, or provide a server path to one.</p>
+      <p>Upload fuel burn CSV file(s), or provide server path(s) to them. Select/list more than one to combine them into a single training run (e.g. multiple months).</p>
       <form id="form-train-upload">
-        <label>Upload CSV File
-          <input type="file" name="file" accept=".csv" required />
+        <label>Upload CSV File(s)
+          <input type="file" name="file" accept=".csv" multiple required />
         </label>
         <button type="submit">Upload &amp; Train</button>
       </form>
@@ -176,8 +176,8 @@
       <p class="divider">— or —</p>
 
       <form id="form-train">
-        <label>CSV File Path (on the server)
-          <input type="text" name="csv_path" placeholder="e.g. flights_XXX_Air_01_01_2025_to_31_01_2025.csv" />
+        <label>CSV File Path(s) on the server <span class="optional">comma-separated for multiple</span>
+          <input type="text" name="csv_path" placeholder="e.g. flights_jan.csv, flights_feb.csv" />
         </label>
         <button type="submit">Train from Path</button>
       </form>

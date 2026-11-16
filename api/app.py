@@ -63,18 +63,21 @@ def health():
 
 @app.route("/train", methods=["POST"])
 def train():
-    """Train model from a CSV file path.
+    """Train model from one or more CSV file paths.
 
     POST body: {"csv_path": "/path/to/fuel_data.csv"}
+    or:        {"csv_paths": ["/path/jan.csv", "/path/feb.csv"]} to combine several
     """
     data = request.get_json()
-    csv_path = data.get("csv_path")
-    if not csv_path:
-        return jsonify({"error": "csv_path is required"}), 400
+    csv_paths = data.get("csv_paths")
+    if not csv_paths and data.get("csv_path"):
+        csv_paths = [data["csv_path"]]
+    if not csv_paths:
+        return jsonify({"error": "csv_path or csv_paths is required"}), 400
 
     test_size = float(data.get("test_size", 0.2))
     try:
-        result = model.train_from_csv(csv_path, test_size=test_size)
+        result = model.train_from_csv(csv_paths, test_size=test_size)
         model.save_model(MODEL_PATH)
         return jsonify({"status": "trained", **_clean_numpy(result)})
     except Exception as e:
@@ -83,35 +86,44 @@ def train():
 
 @app.route("/train/upload", methods=["POST"])
 def train_upload():
-    """Train model from an uploaded CSV file (browser file picker, not a server path).
+    """Train model from one or more uploaded CSV files (combined into a
+    single training run if more than one), instead of a server path.
 
-    multipart/form-data: "file" (the CSV), optional "test_size" field.
+    multipart/form-data: one or more "file" fields (the CSVs), optional
+    "test_size" field.
     """
-    if "file" not in request.files:
+    files = [f for f in request.files.getlist("file") if f.filename]
+    if not files:
         return jsonify({"error": "No file uploaded"}), 400
-
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"error": "No file selected"}), 400
-    if not file.filename.lower().endswith(".csv"):
-        return jsonify({"error": "File must be a .csv"}), 400
+    for f in files:
+        if not f.filename.lower().endswith(".csv"):
+            return jsonify({"error": f"File must be a .csv: {f.filename}"}), 400
 
     test_size = float(request.form.get("test_size", 0.2))
 
-    # Save to a temp path so train_from_csv (which expects a path) can read it,
-    # then clean up regardless of outcome.
-    safe_name = secure_filename(file.filename)
-    fd, tmp_path = tempfile.mkstemp(suffix=f"_{safe_name}")
-    os.close(fd)
+    # Save each to a temp path so train_from_csv (which expects paths) can
+    # read them, then clean all of them up regardless of outcome.
+    tmp_paths = []
     try:
-        file.save(tmp_path)
-        result = model.train_from_csv(tmp_path, test_size=test_size)
+        for f in files:
+            safe_name = secure_filename(f.filename)
+            fd, tmp_path = tempfile.mkstemp(suffix=f"_{safe_name}")
+            os.close(fd)
+            f.save(tmp_path)
+            tmp_paths.append(tmp_path)
+
+        result = model.train_from_csv(
+            tmp_paths, test_size=test_size,
+            source_names=[secure_filename(f.filename) for f in files],
+        )
         model.save_model(MODEL_PATH)
         return jsonify({"status": "trained", **_clean_numpy(result)})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
     finally:
-        os.remove(tmp_path)
+        for p in tmp_paths:
+            if os.path.exists(p):
+                os.remove(p)
 
 
 @app.route("/estimate", methods=["POST"])

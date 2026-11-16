@@ -158,6 +158,12 @@ class PerformanceModel:
             return None
         return profile.feature_importance
 
+    def reset(self) -> None:
+        """Clear all learned profiles — call before a fresh training run
+        so aircraft families from a previous, unrelated run can't
+        silently stick around."""
+        self._profiles = {}
+
     def get_state(self) -> dict:
         """Return picklable state for model persistence."""
         return {"profiles": self._profiles}
