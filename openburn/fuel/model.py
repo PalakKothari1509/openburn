@@ -13,6 +13,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from openburn.aircraft.performance import PerformanceModel
+from openburn.aircraft.registry import AircraftRegistry
 from openburn.fuel.features import (
     FeatureExtractor, load_airport_coords, _AIRPORT_COORDS, _haversine,
 )
@@ -20,6 +21,8 @@ from openburn.fuel.fallback import FallbackEstimator
 
 # Default airport coords file (relative to package)
 _DEFAULT_AIRPORT_COORDS = Path(__file__).resolve().parent.parent.parent / "data" / "airport_coords.csv"
+# Default aircraft type data (real-world range, used to flag unrealistic distances)
+_DEFAULT_AIRCRAFT_TYPES = Path(__file__).resolve().parent.parent.parent / "data" / "sample_aircraft_types.csv"
 
 
 class FuelBurnModel:
@@ -43,6 +46,12 @@ class FuelBurnModel:
         coords_path = Path(airport_coords_path) if airport_coords_path else _DEFAULT_AIRPORT_COORDS
         if coords_path.exists():
             load_airport_coords(str(coords_path))
+
+        # Load real-world aircraft range data, used to flag distances that
+        # aren't realistic for the given aircraft (see _range_warning)
+        self.aircraft_registry = AircraftRegistry()
+        if _DEFAULT_AIRCRAFT_TYPES.exists():
+            self.aircraft_registry.load_csv(_DEFAULT_AIRCRAFT_TYPES)
 
     def train_from_csv(
         self,
@@ -175,17 +184,23 @@ class FuelBurnModel:
             features["payload_kg"] = payload_kg
         features.update(extra_features)
 
+        warning = self._range_warning(aircraft_type, distance_km)
+
         # Try the trained per-family model first
         result = self.performance.predict(aircraft_type, features)
         if result is not None:
             result["method"] = "trained_model"
-            result["confidence"] = "high"
+            result["confidence"] = "low" if warning else "high"
+            if warning:
+                result["warning"] = warning
             return result
 
         # Fall back to general estimator
         fallback_result = self.fallback.estimate(aircraft_type, distance_km)
         fallback_result["method"] = "fallback"
         fallback_result["confidence"] = "low"
+        if warning:
+            fallback_result["warning"] = warning
         return fallback_result
 
     def batch_estimate(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -200,6 +215,7 @@ class FuelBurnModel:
         df["fuel_burn_estimated_kg"] = np.nan
         df["estimation_method"] = ""
         df["estimation_confidence"] = ""
+        df["warning"] = ""
 
         family_col = "aircraft_family" if "aircraft_family" in df.columns else "aircraft_type"
 
@@ -232,6 +248,20 @@ class FuelBurnModel:
                     df.loc[idx, "fuel_burn_estimated_kg"] = fb["fuel_burn_kg"]
                     df.loc[idx, "estimation_method"] = "fallback"
                     df.loc[idx, "estimation_confidence"] = "low"
+
+            # Flag rows whose distance isn't realistic for this aircraft's
+            # known range — the model still predicted something, but it's
+            # extrapolating far outside anything it has actually seen, so
+            # this runs after (and overrides) the confidence set above.
+            ac = self.aircraft_registry.get(str(family))
+            if ac is not None and ac.range_km is not None and "distance_km" in family_df.columns:
+                exceeds = family_df["distance_km"] > ac.range_km
+                if exceeds.any():
+                    flagged_idx = family_df.index[exceeds]
+                    df.loc[flagged_idx, "estimation_confidence"] = "low"
+                    df.loc[flagged_idx, "warning"] = (
+                        f"Distance exceeds {family}'s typical range (~{round(ac.range_km)} km)"
+                    )
 
         return df
 
@@ -288,15 +318,19 @@ class FuelBurnModel:
             features["passengers"] = float(passengers)
             features["payload_kg"] = float(passengers) * 100  # ~100kg per pax
 
+        warning = self._range_warning(aircraft_type, distance_km)
+
         # Get fuel estimate
         result = self.performance.predict(aircraft_type, features)
         if result is not None:
             result["method"] = "trained_model"
-            result["confidence"] = "high"
+            result["confidence"] = "low" if warning else "high"
         else:
             result = self.fallback.estimate(aircraft_type, distance_km)
             result["method"] = "fallback"
             result["confidence"] = "low"
+        if warning:
+            result["warning"] = warning
 
         # Add route info
         from openburn.reporting.emissions import EmissionsReport
@@ -311,6 +345,23 @@ class FuelBurnModel:
         result["emissions"] = em.from_fuel_kg(result["fuel_burn_kg"])
 
         return result
+
+    def _range_warning(self, aircraft_type: str, distance_km: float) -> Optional[str]:
+        """Return a warning if distance_km exceeds this aircraft's known
+        real-world range (e.g. a narrowbody being asked to fly a route only
+        a widebody could manage non-stop) — the trained model will still
+        produce a number, but it's extrapolating far outside anything it
+        has actually seen, so callers should treat it as unreliable."""
+        ac = self.aircraft_registry.get(aircraft_type)
+        if ac is None or ac.range_km is None:
+            return None
+        if distance_km > ac.range_km:
+            return (
+                f"Distance ({round(distance_km)} km) exceeds {aircraft_type}'s "
+                f"typical range (~{round(ac.range_km)} km) — not realistic "
+                f"non-stop, so this estimate may be unreliable."
+            )
+        return None
 
     def get_airports(self) -> list[str]:
         """Return list of known airport codes."""

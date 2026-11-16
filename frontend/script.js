@@ -88,6 +88,14 @@ document.getElementById("form-route").addEventListener("submit", async (e) => {
     document.getElementById("route-confidence").textContent = data.confidence;
     document.getElementById("route-rmse").textContent = data.model_rmse_kg || "N/A";
 
+    const routeWarning = document.getElementById("route-warning");
+    if (data.warning) {
+      routeWarning.textContent = `⚠ ${data.warning}`;
+      routeWarning.hidden = false;
+    } else {
+      routeWarning.hidden = true;
+    }
+
     // Emissions breakdown
     const breakdown = document.getElementById("route-emissions-breakdown");
     breakdown.innerHTML = Object.entries(data.emissions)
@@ -123,6 +131,14 @@ document.getElementById("form-estimate").addEventListener("submit", async (e) =>
     document.getElementById("est-method").textContent = data.method;
     document.getElementById("est-confidence").textContent = data.confidence;
 
+    const estWarning = document.getElementById("est-warning");
+    if (data.warning) {
+      estWarning.textContent = `⚠ ${data.warning}`;
+      estWarning.hidden = false;
+    } else {
+      estWarning.hidden = true;
+    }
+
     const breakdown = document.getElementById("emissions-breakdown");
     breakdown.innerHTML = Object.entries(data.emissions)
       .map(([k, v]) => `<div class="emission-row"><span>${k.toUpperCase()}</span><span>${formatNum(v)} kg</span></div>`)
@@ -151,7 +167,7 @@ document.getElementById("form-batch").addEventListener("submit", async (e) => {
 
     if (data.length === 0) { showError("No results"); return; }
 
-    const cols = ["aircraft_family", "distance_km", "fuel_burn_estimated_kg", "co2_kg", "estimation_method", "estimation_confidence"];
+    const cols = ["aircraft_family", "distance_km", "fuel_burn_estimated_kg", "co2_kg", "estimation_method", "estimation_confidence", "warning"];
     const available = cols.filter((c) => c in data[0]);
 
     thead.innerHTML = available.map((c) => `<th>${c}</th>`).join("");
