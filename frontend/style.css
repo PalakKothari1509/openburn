@@ -108,7 +108,8 @@ body {
   flex-wrap: wrap;
 }
 
-.navbar-title { font-size: 1.05rem; font-weight: 700; color: var(--text); }
+.navbar-title { display: block; font-size: 1.05rem; font-weight: 700; color: var(--text); }
+.navbar-subtitle { display: block; font-size: 0.78rem; color: var(--muted); margin-top: 0.1rem; }
 
 .label {
   display: inline-block;
@@ -366,6 +367,17 @@ pre {
 
 .card { margin-bottom: 0; }
 .text-muted { color: var(--muted); }
+
+.ibox-lead code {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.78rem;
+  background: var(--row-stripe);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.05rem 0.3rem;
+}
+
+.stat-box[title] { cursor: help; }
 
 @media (max-width: 760px) {
   #wrapper { flex-direction: column; }

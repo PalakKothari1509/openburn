@@ -21,11 +21,11 @@
           </div>
         </div>
         <ul class="nav" id="side-menu">
-          <li><a class="tab active" data-tab="route"><i class="fa fa-location-arrow"></i> <span>Route Estimate</span></a></li>
-          <li><a class="tab" data-tab="estimate"><i class="fa fa-sliders"></i> <span>Advanced</span></a></li>
-          <li><a class="tab" data-tab="batch"><i class="fa fa-list-alt"></i> <span>Batch</span></a></li>
-          <li><a class="tab" data-tab="train"><i class="fa fa-cloud-upload"></i> <span>Train Model</span></a></li>
-          <li><a class="tab" data-tab="families"><i class="fa fa-database"></i> <span>Families</span></a></li>
+          <li><a class="tab active" data-tab="route"><i class="fa fa-location-arrow"></i> <span>Estimate by Route</span></a></li>
+          <li><a class="tab" data-tab="estimate"><i class="fa fa-sliders"></i> <span>Manual Estimate</span></a></li>
+          <li><a class="tab" data-tab="batch"><i class="fa fa-list-alt"></i> <span>Bulk Estimate</span></a></li>
+          <li><a class="tab" data-tab="train"><i class="fa fa-cloud-upload"></i> <span>Train the Model</span></a></li>
+          <li><a class="tab" data-tab="families"><i class="fa fa-database"></i> <span>Model Accuracy</span></a></li>
         </ul>
       </div>
     </nav>
@@ -33,7 +33,10 @@
     <!-- Main content -->
     <div id="page-wrapper" class="gray-bg">
       <nav class="navbar navbar-static-top">
-        <span class="navbar-title">Aviation Fuel Burn Dashboard</span>
+        <span>
+          <span class="navbar-title">Aviation Fuel Burn Dashboard</span>
+          <span class="navbar-subtitle">Estimate how much fuel a flight will burn, and the CO2 it will produce</span>
+        </span>
         <span id="model-status" class="label label-warning" role="status" aria-live="polite">Model not trained</span>
       </nav>
 
@@ -44,9 +47,15 @@
         <!-- Route-based estimate (primary) -->
         <section class="card" id="tab-route">
           <div class="ibox">
-            <div class="ibox-title"><h5>Fuel Burn by Route</h5></div>
+            <div class="ibox-title"><h5>Estimate Fuel Burn by Route</h5></div>
             <div class="ibox-content">
-              <p class="ibox-lead">Enter departure, arrival, and aircraft type to estimate fuel burn.</p>
+              <p class="ibox-lead">
+                The recommended way to get an estimate. Pick a departure airport,
+                an arrival airport, and an aircraft type — OpenBurn works out the
+                flight distance and duration automatically and predicts fuel burn
+                and emissions from the trained model. Use this unless you already
+                know the exact distance/duration yourself (see <strong>Manual Estimate</strong>).
+              </p>
               <form id="form-route">
                 <div class="row">
                   <div class="form-group col-sm-3">
@@ -115,9 +124,16 @@
         <!-- Advanced estimate -->
         <section class="card hidden" id="tab-estimate">
           <div class="ibox">
-            <div class="ibox-title"><h5>Advanced Estimate</h5></div>
+            <div class="ibox-title"><h5>Manual Estimate (by Distance)</h5></div>
             <div class="ibox-content">
-              <p class="ibox-lead">Manually enter distance and optional parameters.</p>
+              <p class="ibox-lead">
+                For when you already know the flight's distance (not just the
+                airport codes) — e.g. a custom or non-airport route, or you
+                want to override the auto-calculated distance/duration from
+                the <strong>Estimate by Route</strong> tab. Only aircraft type
+                and distance are required; duration and cruise altitude are
+                optional and improve accuracy if you have them.
+              </p>
               <form id="form-estimate">
                 <div class="row">
                   <div class="form-group col-sm-3">
@@ -175,12 +191,19 @@
         <!-- Batch estimate -->
         <section class="card hidden" id="tab-batch">
           <div class="ibox">
-            <div class="ibox-title"><h5>Batch Estimate</h5></div>
+            <div class="ibox-title"><h5>Bulk Estimate (Many Flights at Once)</h5></div>
             <div class="ibox-content">
-              <p class="ibox-lead">Paste a JSON array of flights.</p>
+              <p class="ibox-lead">
+                Estimate fuel burn for a whole list of flights in one go,
+                instead of one at a time — useful for checking a day's
+                schedule or a batch of routes. Paste a JSON list below, where
+                each flight has at least an <code>aircraft_type</code> and
+                <code>distance_km</code>. Not sure of the format? Click
+                "Load example" to see one filled in.
+              </p>
               <form id="form-batch">
                 <div class="form-group">
-                  <label>Flights (JSON)</label>
+                  <label>Flights (JSON list)</label>
                   <textarea class="form-control" name="flights" rows="7" placeholder='[{"aircraft_type":"A320","distance_km":1500},{"aircraft_type":"E190","distance_km":800}]'></textarea>
                 </div>
                 <button type="submit" class="btn btn-primary">Estimate Batch</button>
@@ -203,13 +226,24 @@
         <!-- Train model -->
         <section class="card hidden" id="tab-train">
           <div class="ibox">
-            <div class="ibox-title"><h5>Train Model</h5></div>
+            <div class="ibox-title"><h5>Train the Model on Your Flight Data</h5></div>
             <div class="ibox-content">
-              <p class="ibox-lead">New files are added to everything trained before — uploading February's data keeps January's too.</p>
+              <p class="ibox-lead">
+                This is the step that teaches OpenBurn your airline's real
+                fuel-burn numbers. Upload one or more CSV files of past
+                flights that include actual fuel burned — the model learns a
+                separate pattern for each aircraft type from this data. You
+                must train the model at least once before the
+                <strong>Estimate by Route</strong>, <strong>Manual
+                Estimate</strong>, or <strong>Bulk Estimate</strong> tabs will
+                return a result. New uploads are added to everything trained
+                before (e.g. uploading February's data keeps January's too),
+                unless you check "Start fresh" to discard old data first.
+              </p>
 
               <form id="form-train-upload">
                 <div class="form-group">
-                  <label>Upload CSV File(s)</label>
+                  <label>Upload CSV File(s) from Your Computer</label>
                   <input type="file" class="form-control" name="file" accept=".csv" multiple required />
                 </div>
                 <div class="checkbox">
@@ -219,7 +253,7 @@
               </form>
 
               <div class="hr-line-dashed"></div>
-              <p class="text-muted small">or train from a server path</p>
+              <p class="text-muted small">Already have the CSV on the server running this app? Train from its path instead:</p>
 
               <form id="form-train">
                 <div class="form-group">
@@ -235,28 +269,29 @@
           </div>
 
           <div class="ibox" id="result-train" hidden>
-            <div class="ibox-title"><h5>Training Output</h5></div>
+            <div class="ibox-title"><h5>Training Results</h5></div>
             <div class="ibox-content">
               <div class="stat-grid">
                 <div class="stat-box stat-box-primary">
-                  <span class="stat-label">Total Flights</span>
+                  <span class="stat-label">Total Flights Used</span>
                   <span class="stat-value" id="train-total">-</span>
                 </div>
                 <div class="stat-box">
-                  <span class="stat-label">Families Trained</span>
+                  <span class="stat-label">Aircraft Types Trained</span>
                   <span class="stat-value" id="train-families">-</span>
                 </div>
-                <div class="stat-box">
-                  <span class="stat-label">Holdout MAPE</span>
+                <div class="stat-box" title="Average error, as a percentage, on flights the model did not see while training">
+                  <span class="stat-label">Accuracy (MAPE) &#9432;</span>
                   <span class="stat-value" id="train-mape">-</span>
                 </div>
-                <div class="stat-box">
-                  <span class="stat-label">Holdout R&#178;</span>
+                <div class="stat-box" title="How much of the variation in fuel burn the model explains — 1.0 is a perfect fit">
+                  <span class="stat-label">Model Fit (R&#178;) &#9432;</span>
                   <span class="stat-value" id="train-r2">-</span>
                 </div>
               </div>
+              <p class="text-muted small">Lower MAPE and an R&#178; closer to 1.0 both mean more accurate predictions. See the <strong>Model Accuracy</strong> tab for a breakdown per aircraft type.</p>
               <details class="more">
-                <summary>Full raw response</summary>
+                <summary>Full raw response (for debugging)</summary>
                 <pre id="train-output"></pre>
               </details>
             </div>
@@ -266,27 +301,35 @@
         <!-- Aircraft families -->
         <section class="card hidden" id="tab-families">
           <div class="ibox">
-            <div class="ibox-title"><h5>Trained Aircraft Families</h5></div>
+            <div class="ibox-title"><h5>How Accurate Is the Model?</h5></div>
             <div class="ibox-content">
-              <p class="ibox-lead">What the model has learned so far, and which factors matter most.</p>
+              <p class="ibox-lead">
+                A report card for the trained model: which aircraft types it
+                knows, how many flights it learned each one from, how
+                accurate its predictions are per type (lower RMSE is better),
+                and which flight details (distance, altitude, payload, etc.)
+                matter most for each aircraft's fuel burn.
+              </p>
               <button id="btn-load-families" class="btn btn-primary">Refresh</button>
 
               <div id="result-summary" hidden>
                 <div class="hr-line-dashed"></div>
+                <p class="text-muted small" style="margin-bottom: 0.6rem;">Overall, across all aircraft types:</p>
                 <div class="summary-line">
-                  <span><strong id="sum-total">-</strong> flights</span>
-                  <span>MAPE <strong id="sum-mape">-</strong></span>
-                  <span>R&#178; <strong id="sum-r2">-</strong></span>
-                  <span>RMSE <strong id="sum-rmse">-</strong></span>
+                  <span><strong id="sum-total">-</strong> flights trained on</span>
+                  <span title="Average error, as a percentage, on flights the model did not see while training">MAPE (avg. error) <strong id="sum-mape">-</strong></span>
+                  <span title="How much of the variation in fuel burn the model explains — 1.0 is a perfect fit">R&#178; (model fit) <strong id="sum-r2">-</strong></span>
+                  <span title="Root-mean-square error, in kilograms of fuel">RMSE <strong id="sum-rmse">-</strong></span>
                 </div>
-                <p class="text-muted small">Trained <span id="sum-trained-at">-</span> from <span id="sum-trained-from">-</span></p>
+                <p class="text-muted small">Last trained <span id="sum-trained-at">-</span> from <span id="sum-trained-from">-</span></p>
               </div>
 
               <div id="result-families" hidden class="table-responsive">
                 <div class="hr-line-dashed"></div>
+                <p class="text-muted small" style="margin-bottom: 0.6rem;">Broken down by aircraft type:</p>
                 <table class="table table-striped table-hover" id="families-table">
                   <thead>
-                    <tr><th>Family</th><th>RMSE (kg)</th><th>Flights</th><th title="The 3 flight details that most change this aircraft's fuel estimate — found by testing how much the prediction shifts when each one is varied.">Top Factors &#9432;</th></tr>
+                    <tr><th>Aircraft Type</th><th title="Root-mean-square error in kilograms of fuel — how far off a typical prediction is. Lower is better.">Prediction Error (RMSE, kg) &#9432;</th><th>Flights Trained On</th><th title="The 3 flight details that most change this aircraft's fuel estimate — found by testing how much the prediction shifts when each one is varied.">Top Factors &#9432;</th></tr>
                   </thead>
                   <tbody id="family-grid"></tbody>
                 </table>

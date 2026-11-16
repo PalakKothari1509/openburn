@@ -85,7 +85,7 @@ async function checkStatus() {
       badge.textContent = `Model trained — ${data.families_available.length} aircraft types${trainedNote}`;
       badge.className = "label label-primary";
     } else {
-      badge.textContent = "Model not trained — go to Train Model tab";
+      badge.textContent = "Model not trained — go to the \"Train the Model\" tab";
       badge.className = "label label-warning";
     }
     populateAircraftSelect(data.model_trained ? data.families_available : []);
