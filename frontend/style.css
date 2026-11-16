@@ -13,7 +13,7 @@
   --border: #e7eaec;
   --row-stripe: #f8f8f9;
   --text: #333333;
-  --muted: #999999;
+  --muted: #6b6b6b;
   --danger: #ed5565;
   --danger-soft: #fdecea;
   --warning: #f8ac59;
@@ -367,15 +367,6 @@ pre {
 
 .card { margin-bottom: 0; }
 .text-muted { color: var(--muted); }
-
-.ibox-lead code {
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 0.78rem;
-  background: var(--row-stripe);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 0.05rem 0.3rem;
-}
 
 .stat-box[title] { cursor: help; }
 

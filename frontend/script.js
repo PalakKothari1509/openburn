@@ -29,9 +29,10 @@ function clearBusy(btn) {
 
 function setConfidencePill(el, confidence) {
   el.textContent = confidence || "-";
-  el.classList.remove("confidence-high", "confidence-low");
-  if (confidence === "high") el.classList.add("confidence-high");
-  else if (confidence === "low") el.classList.add("confidence-low");
+  el.classList.remove("confidence-pill", "confidence-high", "confidence-low");
+  if (confidence === "high" || confidence === "low") {
+    el.classList.add("confidence-pill", `confidence-${confidence}`);
+  }
 }
 
 function renderEmissionsBreakdown(container, emissions) {

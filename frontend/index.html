@@ -47,7 +47,7 @@
         <!-- Route-based estimate (primary) -->
         <section class="card" id="tab-route">
           <div class="ibox">
-            <div class="ibox-title"><h5>Estimate Fuel Burn by Route</h5></div>
+            <div class="ibox-title"><h5>Estimate by Route</h5></div>
             <div class="ibox-content">
               <p class="ibox-lead">Pick departure, arrival, and aircraft type — we calculate distance and duration automatically.</p>
               <form id="form-route">
@@ -78,7 +78,7 @@
           </div>
 
           <div class="ibox" id="result-route" hidden>
-            <div class="ibox-title"><h5 id="route-header">Result</h5></div>
+            <div class="ibox-title"><h5 id="route-header">Route Estimate Result</h5></div>
             <div class="ibox-content">
               <div class="stat-grid">
                 <div class="stat-box stat-box-primary">
@@ -99,7 +99,7 @@
                 </div>
                 <div class="stat-box">
                   <span class="stat-label">Confidence</span>
-                  <span class="stat-value confidence-pill" id="route-confidence">-</span>
+                  <span class="stat-value" id="route-confidence">-</span>
                 </div>
                 <div class="stat-box">
                   <span class="stat-label">Model RMSE (kg)</span>
@@ -118,7 +118,7 @@
         <!-- Advanced estimate -->
         <section class="card hidden" id="tab-estimate">
           <div class="ibox">
-            <div class="ibox-title"><h5>Manual Estimate (by Distance)</h5></div>
+            <div class="ibox-title"><h5>Manual Estimate</h5></div>
             <div class="ibox-content">
               <p class="ibox-lead">Already know the distance? Enter it directly instead of airport codes.</p>
               <form id="form-estimate">
@@ -146,7 +146,7 @@
           </div>
 
           <div class="ibox" id="result-estimate" hidden>
-            <div class="ibox-title"><h5>Result</h5></div>
+            <div class="ibox-title"><h5>Manual Estimate Result</h5></div>
             <div class="ibox-content">
               <div class="stat-grid">
                 <div class="stat-box stat-box-primary">
@@ -163,7 +163,7 @@
                 </div>
                 <div class="stat-box">
                   <span class="stat-label">Confidence</span>
-                  <span class="stat-value confidence-pill" id="est-confidence">-</span>
+                  <span class="stat-value" id="est-confidence">-</span>
                 </div>
               </div>
               <div class="alert alert-warning" id="est-warning" hidden></div>
@@ -178,7 +178,7 @@
         <!-- Batch estimate -->
         <section class="card hidden" id="tab-batch">
           <div class="ibox">
-            <div class="ibox-title"><h5>Bulk Estimate (Many Flights at Once)</h5></div>
+            <div class="ibox-title"><h5>Bulk Estimate</h5></div>
             <div class="ibox-content">
               <p class="ibox-lead">Estimate many flights at once. Paste a JSON list, or click "Load example" to see the format.</p>
               <form id="form-batch">
@@ -206,7 +206,7 @@
         <!-- Train model -->
         <section class="card hidden" id="tab-train">
           <div class="ibox">
-            <div class="ibox-title"><h5>Train the Model on Your Flight Data</h5></div>
+            <div class="ibox-title"><h5>Train the Model</h5></div>
             <div class="ibox-content">
               <p class="ibox-lead">Upload past flights with actual fuel data to teach the model. Required before any estimate tab will work.</p>
 
@@ -270,7 +270,7 @@
         <!-- Aircraft families -->
         <section class="card hidden" id="tab-families">
           <div class="ibox">
-            <div class="ibox-title"><h5>How Accurate Is the Model?</h5></div>
+            <div class="ibox-title"><h5>Model Accuracy</h5></div>
             <div class="ibox-content">
               <p class="ibox-lead">A report card for the trained model — accuracy per aircraft type, and what drives each one's fuel burn.</p>
               <button id="btn-load-families" class="btn btn-primary">Refresh</button>
