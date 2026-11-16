@@ -49,13 +49,7 @@
           <div class="ibox">
             <div class="ibox-title"><h5>Estimate Fuel Burn by Route</h5></div>
             <div class="ibox-content">
-              <p class="ibox-lead">
-                The recommended way to get an estimate. Pick a departure airport,
-                an arrival airport, and an aircraft type — OpenBurn works out the
-                flight distance and duration automatically and predicts fuel burn
-                and emissions from the trained model. Use this unless you already
-                know the exact distance/duration yourself (see <strong>Manual Estimate</strong>).
-              </p>
+              <p class="ibox-lead">Pick departure, arrival, and aircraft type — we calculate distance and duration automatically.</p>
               <form id="form-route">
                 <div class="row">
                   <div class="form-group col-sm-3">
@@ -126,14 +120,7 @@
           <div class="ibox">
             <div class="ibox-title"><h5>Manual Estimate (by Distance)</h5></div>
             <div class="ibox-content">
-              <p class="ibox-lead">
-                For when you already know the flight's distance (not just the
-                airport codes) — e.g. a custom or non-airport route, or you
-                want to override the auto-calculated distance/duration from
-                the <strong>Estimate by Route</strong> tab. Only aircraft type
-                and distance are required; duration and cruise altitude are
-                optional and improve accuracy if you have them.
-              </p>
+              <p class="ibox-lead">Already know the distance? Enter it directly instead of airport codes.</p>
               <form id="form-estimate">
                 <div class="row">
                   <div class="form-group col-sm-3">
@@ -193,14 +180,7 @@
           <div class="ibox">
             <div class="ibox-title"><h5>Bulk Estimate (Many Flights at Once)</h5></div>
             <div class="ibox-content">
-              <p class="ibox-lead">
-                Estimate fuel burn for a whole list of flights in one go,
-                instead of one at a time — useful for checking a day's
-                schedule or a batch of routes. Paste a JSON list below, where
-                each flight has at least an <code>aircraft_type</code> and
-                <code>distance_km</code>. Not sure of the format? Click
-                "Load example" to see one filled in.
-              </p>
+              <p class="ibox-lead">Estimate many flights at once. Paste a JSON list, or click "Load example" to see the format.</p>
               <form id="form-batch">
                 <div class="form-group">
                   <label>Flights (JSON list)</label>
@@ -228,18 +208,7 @@
           <div class="ibox">
             <div class="ibox-title"><h5>Train the Model on Your Flight Data</h5></div>
             <div class="ibox-content">
-              <p class="ibox-lead">
-                This is the step that teaches OpenBurn your airline's real
-                fuel-burn numbers. Upload one or more CSV files of past
-                flights that include actual fuel burned — the model learns a
-                separate pattern for each aircraft type from this data. You
-                must train the model at least once before the
-                <strong>Estimate by Route</strong>, <strong>Manual
-                Estimate</strong>, or <strong>Bulk Estimate</strong> tabs will
-                return a result. New uploads are added to everything trained
-                before (e.g. uploading February's data keeps January's too),
-                unless you check "Start fresh" to discard old data first.
-              </p>
+              <p class="ibox-lead">Upload past flights with actual fuel data to teach the model. Required before any estimate tab will work.</p>
 
               <form id="form-train-upload">
                 <div class="form-group">
@@ -253,7 +222,7 @@
               </form>
 
               <div class="hr-line-dashed"></div>
-              <p class="text-muted small">Already have the CSV on the server running this app? Train from its path instead:</p>
+              <p class="text-muted small">Or train from a CSV path on the server:</p>
 
               <form id="form-train">
                 <div class="form-group">
@@ -289,7 +258,7 @@
                   <span class="stat-value" id="train-r2">-</span>
                 </div>
               </div>
-              <p class="text-muted small">Lower MAPE and an R&#178; closer to 1.0 both mean more accurate predictions. See the <strong>Model Accuracy</strong> tab for a breakdown per aircraft type.</p>
+              <p class="text-muted small">Lower MAPE and R&#178; closer to 1.0 = more accurate.</p>
               <details class="more">
                 <summary>Full raw response (for debugging)</summary>
                 <pre id="train-output"></pre>
@@ -303,13 +272,7 @@
           <div class="ibox">
             <div class="ibox-title"><h5>How Accurate Is the Model?</h5></div>
             <div class="ibox-content">
-              <p class="ibox-lead">
-                A report card for the trained model: which aircraft types it
-                knows, how many flights it learned each one from, how
-                accurate its predictions are per type (lower RMSE is better),
-                and which flight details (distance, altitude, payload, etc.)
-                matter most for each aircraft's fuel burn.
-              </p>
+              <p class="ibox-lead">A report card for the trained model — accuracy per aircraft type, and what drives each one's fuel burn.</p>
               <button id="btn-load-families" class="btn btn-primary">Refresh</button>
 
               <div id="result-summary" hidden>
