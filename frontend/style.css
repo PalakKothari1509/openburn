@@ -293,6 +293,7 @@ input[type="file"].form-control { border: none; padding: 0.3rem 0; background: n
 table.table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .table th, .table td { padding: 0.65rem 0.7rem; text-align: left; border-bottom: 1px solid var(--border); }
 .table thead th { color: var(--muted); text-transform: uppercase; font-size: 0.66rem; letter-spacing: 0.03em; border-bottom: 2px solid var(--border); }
+.table thead th[title] { cursor: help; }
 .table-striped tbody tr:nth-child(odd) { background: var(--row-stripe); }
 .table-hover tbody tr:hover { background: var(--accent-soft); }
 
