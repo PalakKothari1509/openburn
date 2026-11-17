@@ -249,16 +249,19 @@
                   <span class="stat-label">Aircraft Types Trained</span>
                   <span class="stat-value" id="train-families">-</span>
                 </div>
-                <div class="stat-box" title="Average error, as a percentage, on flights the model did not see while training">
-                  <span class="stat-label">Accuracy (MAPE) &#9432;</span>
+                <div class="stat-box" title="On average, how far off a fuel-burn guess usually is, as a percentage. Lower is better.">
+                  <span class="stat-label">Typical Error &#9432;</span>
                   <span class="stat-value" id="train-mape">-</span>
                 </div>
-                <div class="stat-box" title="How much of the variation in fuel burn the model explains — 1.0 is a perfect fit">
-                  <span class="stat-label">Model Fit (R&#178;) &#9432;</span>
+                <div class="stat-box" title="How well the model's guesses follow the real pattern of fuel burn across different flights. Closer to 100% is better.">
+                  <span class="stat-label">Consistency &#9432;</span>
                   <span class="stat-value" id="train-r2">-</span>
                 </div>
               </div>
-              <p class="text-muted small">Lower MAPE and R&#178; closer to 1.0 = more accurate.</p>
+              <p class="text-muted small">
+                <strong>Typical Error</strong> — on average, how far off a guess usually is (lower is better).
+                <strong>Consistency</strong> — how well the guesses follow the real pattern across flights (closer to 100% is better).
+              </p>
               <details class="more">
                 <summary>Full raw response (for debugging)</summary>
                 <pre id="train-output"></pre>
@@ -286,22 +289,23 @@
                     <span class="stat-label">Flights Trained On</span>
                     <span class="stat-value" id="sum-total">-</span>
                   </div>
-                  <div class="stat-box" title="The usual difference between an estimate and the actual fuel burned, as a percentage, measured on flights the model did not train on">
+                  <div class="stat-box" title="On average, how far off a fuel-burn guess usually is, as a percentage. Lower is better.">
                     <span class="stat-label">Typical Error &#9432;</span>
                     <span class="stat-value" id="sum-mape">-</span>
                   </div>
-                  <div class="stat-box" title="How much of the difference in fuel burn between flights the model can explain — higher is better">
+                  <div class="stat-box" title="How well the model's guesses follow the real pattern of fuel burn across different flights. Closer to 100% is better.">
                     <span class="stat-label">Consistency &#9432;</span>
                     <span class="stat-value" id="sum-r2">-</span>
                   </div>
-                  <div class="stat-box" title="The usual difference between an estimate and the actual fuel burned, in kilograms">
+                  <div class="stat-box" title="The same idea as Typical Error, but in kilograms instead of percent — so you can see the actual size of the mistake.">
                     <span class="stat-label">Typical Error (kg) &#9432;</span>
                     <span class="stat-value" id="sum-rmse">-</span>
                   </div>
                 </div>
                 <p class="text-muted small">
-                  Typical Error is how far off a prediction usually is. Consistency is how
-                  reliably the model explains differences between flights — closer to 100% is better.
+                  <strong>Typical Error</strong> — on average, how far off a fuel-burn guess usually is (lower is better).
+                  <strong>Consistency</strong> — how well the guesses follow the real pattern across flights (closer to 100% is better).
+                  <strong>Typical Error (kg)</strong> — the same error, shown in kilograms instead of percent.
                 </p>
                 <p class="text-muted small">Last trained <span id="sum-trained-at">-</span> from <span id="sum-trained-from">-</span></p>
               </div>
@@ -316,6 +320,25 @@
                 </div>
                 <p class="text-muted small" style="margin-bottom: 0.8rem;">Broken down by aircraft type:</p>
                 <div class="accuracy-grid" id="family-grid"></div>
+              </div>
+
+              <div id="result-scatter" hidden>
+                <div class="hr-line-dashed"></div>
+                <p class="text-muted small" style="margin-bottom: 0.8rem;">How close estimates are to real flights:</p>
+
+                <div id="scatter-no-data" class="alert alert-info" hidden>
+                  Retrain the model to see this chart — it's generated the next time the model trains.
+                </div>
+
+                <div id="scatter-chart-wrap">
+                  <div class="scatter-toolbar">
+                    <label for="scatter-family-filter">Aircraft type</label>
+                    <select id="scatter-family-filter" class="form-control"></select>
+                  </div>
+                  <p class="text-muted small">Each dot is one flight kept aside during training — the model never saw its real fuel burn. The dashed line is a perfect estimate; dots closer to it mean more accurate predictions.</p>
+                  <div class="scatter-plot" id="scatter-chart"></div>
+                  <div id="scatter-tooltip" class="scatter-tooltip" hidden></div>
+                </div>
               </div>
             </div>
           </div>

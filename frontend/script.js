@@ -317,7 +317,7 @@ function renderTrainOutput(data) {
   document.getElementById("train-families").textContent = (data.families_trained || []).join(", ") || "-";
   const overall = data.holdout_validation && data.holdout_validation.overall;
   document.getElementById("train-mape").textContent = overall ? `${overall.mape_pct}%` : "N/A";
-  document.getElementById("train-r2").textContent = overall ? overall.r_squared : "N/A";
+  document.getElementById("train-r2").textContent = overall ? `${(overall.r_squared * 100).toFixed(1)}%` : "N/A";
   document.getElementById("train-output").textContent = JSON.stringify(data, null, 2);
   document.getElementById("result-train").hidden = false;
 }
@@ -406,12 +406,148 @@ function accuracyRating(mapePct) {
 // surface before the ones that are already doing fine.
 const RATING_SEVERITY = { poor: 0, unknown: 1, fair: 2, good: 3, excellent: 4 };
 
+// ------------------------------------------------------------
+// Predicted vs actual scatter chart (holdout flights)
+// ------------------------------------------------------------
+let scatterPoints = [];
+
+function renderScatterChart(points) {
+  scatterPoints = points || [];
+  const noData = document.getElementById("scatter-no-data");
+  const wrap = document.getElementById("scatter-chart-wrap");
+
+  if (scatterPoints.length === 0) {
+    noData.hidden = false;
+    wrap.hidden = true;
+    return;
+  }
+  noData.hidden = true;
+  wrap.hidden = false;
+
+  const families = [...new Set(scatterPoints.map((p) => p.family))].sort();
+  const select = document.getElementById("scatter-family-filter");
+  const prevValue = select.value;
+  select.innerHTML =
+    `<option value="">All aircraft</option>` +
+    families.map((f) => `<option value="${f}">${f}</option>`).join("");
+  select.value = families.includes(prevValue) ? prevValue : "";
+
+  drawScatter(select.value);
+}
+
+function drawScatter(familyFilter) {
+  const container = document.getElementById("scatter-chart");
+  const wrap = document.getElementById("scatter-chart-wrap");
+  const points = familyFilter ? scatterPoints.filter((p) => p.family === familyFilter) : scatterPoints;
+
+  if (points.length === 0) {
+    container.innerHTML = "";
+    return;
+  }
+
+  const W = wrap.clientWidth || 600;
+  const H = 360;
+  const PAD = { top: 16, right: 16, bottom: 46, left: 60 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+
+  const allVals = points.flatMap((p) => [p.actual_kg, p.predicted_kg]);
+  const rawMin = Math.min(...allVals);
+  const rawMax = Math.max(...allVals);
+  const span = rawMax - rawMin || Math.max(rawMax, 1);
+  const min = Math.max(0, rawMin - span * 0.05);
+  const max = rawMax + span * 0.05;
+
+  const xPx = (v) => PAD.left + ((v - min) / (max - min)) * plotW;
+  const yPx = (v) => PAD.top + plotH - ((v - min) / (max - min)) * plotH;
+
+  const tickCount = 5;
+  const tickVals = Array.from({ length: tickCount + 1 }, (_, i) => min + (i * (max - min)) / tickCount);
+  const fmtTick = (v) => Math.round(v).toLocaleString();
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="Predicted versus actual fuel burn for ${points.length} holdout flights">`;
+
+  tickVals.forEach((v) => {
+    const gy = yPx(v);
+    svg += `<line x1="${PAD.left}" y1="${gy}" x2="${W - PAD.right}" y2="${gy}" class="scatter-grid" />`;
+    svg += `<text x="${PAD.left - 8}" y="${gy}" class="scatter-tick scatter-tick-y">${fmtTick(v)}</text>`;
+    const gx = xPx(v);
+    svg += `<text x="${gx}" y="${H - PAD.bottom + 20}" class="scatter-tick scatter-tick-x">${fmtTick(v)}</text>`;
+  });
+
+  svg += `<line x1="${PAD.left}" y1="${PAD.top}" x2="${PAD.left}" y2="${H - PAD.bottom}" class="scatter-axis" />`;
+  svg += `<line x1="${PAD.left}" y1="${H - PAD.bottom}" x2="${W - PAD.right}" y2="${H - PAD.bottom}" class="scatter-axis" />`;
+  svg += `<line x1="${xPx(min)}" y1="${yPx(min)}" x2="${xPx(max)}" y2="${yPx(max)}" class="scatter-diagonal" />`;
+
+  svg += `<text x="${PAD.left + plotW / 2}" y="${H - 6}" class="scatter-axis-label">Actual fuel burn (kg)</text>`;
+  svg += `<text x="16" y="${PAD.top + plotH / 2}" class="scatter-axis-label" transform="rotate(-90 16 ${PAD.top + plotH / 2})">Predicted fuel burn (kg)</text>`;
+
+  points.forEach((p, i) => {
+    const px = xPx(p.actual_kg);
+    const py = yPx(p.predicted_kg);
+    svg += `<circle cx="${px}" cy="${py}" r="4" class="scatter-dot" data-i="${i}" />`;
+    svg += `<circle cx="${px}" cy="${py}" r="12" class="scatter-hit" data-i="${i}" tabindex="0" role="button" aria-label="${p.family}: actual ${formatNum(p.actual_kg)} kilograms, predicted ${formatNum(p.predicted_kg)} kilograms" />`;
+  });
+
+  svg += `</svg>`;
+  container.innerHTML = svg;
+
+  const tooltip = document.getElementById("scatter-tooltip");
+  container.querySelectorAll(".scatter-hit").forEach((hit) => {
+    const p = points[Number(hit.dataset.i)];
+    const dot = container.querySelector(`.scatter-dot[data-i="${hit.dataset.i}"]`);
+
+    const show = () => {
+      dot.classList.add("scatter-dot-active");
+      tooltip.innerHTML = "";
+      const valueLine = document.createElement("div");
+      valueLine.className = "scatter-tooltip-value";
+      valueLine.textContent = `${formatNum(p.predicted_kg)} kg predicted vs ${formatNum(p.actual_kg)} kg actual`;
+      const nameLine = document.createElement("div");
+      nameLine.className = "scatter-tooltip-name";
+      nameLine.textContent = p.family;
+      tooltip.appendChild(valueLine);
+      tooltip.appendChild(nameLine);
+
+      const wrapRect = wrap.getBoundingClientRect();
+      const hitRect = hit.getBoundingClientRect();
+      tooltip.style.left = `${hitRect.left + hitRect.width / 2 - wrapRect.left}px`;
+      tooltip.style.top = `${hitRect.top - wrapRect.top}px`;
+      tooltip.hidden = false;
+    };
+    const hide = () => {
+      dot.classList.remove("scatter-dot-active");
+      tooltip.hidden = true;
+    };
+
+    hit.addEventListener("pointerenter", show);
+    hit.addEventListener("pointerleave", hide);
+    hit.addEventListener("focus", show);
+    hit.addEventListener("blur", hide);
+  });
+}
+
+document.getElementById("scatter-family-filter").addEventListener("change", (e) => {
+  drawScatter(e.target.value);
+});
+
+let scatterResizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(scatterResizeTimer);
+  scatterResizeTimer = setTimeout(() => {
+    if (!document.getElementById("scatter-chart-wrap").hidden) {
+      drawScatter(document.getElementById("scatter-family-filter").value);
+    }
+  }, 150);
+});
+
 document.getElementById("btn-load-families").addEventListener("click", async () => {
   hideError();
   if (!modelTrained) {
     document.getElementById("families-untrained").hidden = false;
     document.getElementById("result-summary").hidden = true;
     document.getElementById("result-families").hidden = true;
+    document.getElementById("result-scatter").hidden = true;
     return;
   }
   document.getElementById("families-untrained").hidden = true;
@@ -481,6 +617,10 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
       })
       .join("");
     document.getElementById("result-families").hidden = false;
+
+    document.getElementById("result-scatter").hidden = false;
+    renderScatterChart((summary.holdout_validation && summary.holdout_validation.scatter) || []);
+
     familiesLoaded = true;
   } catch (err) {
     showError(err.message);

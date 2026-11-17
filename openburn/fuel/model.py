@@ -159,6 +159,7 @@ class FuelBurnModel:
                         }
                         for fam, m in by_family.items()
                     },
+                    "scatter": _scatter_points(estimated),
                 }
             except ValueError:
                 pass
@@ -493,3 +494,21 @@ def _fit_duration_model(group: pd.DataFrame) -> tuple[float, float]:
 
     speed = (group["distance_km"] / group["flight_duration_min"]).median()
     return (25.0, 1.0 / speed) if speed > 0 else (25.0, 1.0 / 8.0)
+
+
+def _scatter_points(df: pd.DataFrame, max_points: int = 2500, random_state: int = 42) -> list[dict]:
+    """Sampled (actual, predicted) pairs from a validated holdout DataFrame,
+    for the predicted-vs-actual chart on the Model Accuracy tab. Capped so
+    the JSON response stays small even for a large holdout set."""
+    cols = ["aircraft_family", "fuel_burn_kg", "fuel_burn_estimated_kg"]
+    valid = df[cols].dropna()
+    if len(valid) > max_points:
+        valid = valid.sample(n=max_points, random_state=random_state)
+    return [
+        {
+            "family": str(row.aircraft_family),
+            "actual_kg": round(float(row.fuel_burn_kg), 1),
+            "predicted_kg": round(float(row.fuel_burn_estimated_kg), 1),
+        }
+        for row in valid.itertuples()
+    ]
