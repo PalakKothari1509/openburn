@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import joblib
 import numpy as np
@@ -59,6 +59,7 @@ class FuelBurnModel:
         test_size: float = 0.2,
         random_state: int = 42,
         source_names: Optional[list[str]] = None,
+        progress_callback: Optional[Callable[[str, str], None]] = None,
         **kwargs,
     ) -> dict:
         """Train the model from one or more CSVs of historical fuel burn data.
@@ -82,6 +83,12 @@ class FuelBurnModel:
             Training summary with per-family metrics and validation results.
         """
         paths = [fuel_csv_path] if isinstance(fuel_csv_path, (str, Path)) else list(fuel_csv_path)
+
+        def report(stage: str, detail: str) -> None:
+            if progress_callback:
+                progress_callback(stage, detail)
+
+        report("loading", f"Reading {len(paths)} file(s)...")
 
         # Tag each row with its source file before combining, so we can
         # report how many rows each file actually contributed after
@@ -108,6 +115,8 @@ class FuelBurnModel:
         if "_source_file" in df.columns:
             df = df.drop(columns=["_source_file"])
 
+        report("cleaning", f"Cleaned to {len(df)} usable flights")
+
         # Start from a clean slate — otherwise aircraft families from a
         # previous, unrelated training run could silently stick around
         # even though they're not part of this training data at all.
@@ -126,13 +135,19 @@ class FuelBurnModel:
             test_df = None
 
         # Train per-family performance models
-        profiles = self.performance.train(train_df)
+        def family_progress(i: int, total: int, family: str) -> None:
+            report("training", f"Training {family} ({i} of {total})")
+
+        report("training", "Starting per-aircraft-type training...")
+        profiles = self.performance.train(train_df, progress_callback=family_progress)
 
         # Build fallback estimator from the same data
         self.fallback.fit(train_df)
 
         # Learn average speed per family for route-based estimation
         self._learn_speeds(train_df)
+
+        report("validating", "Validating against holdout flights...")
 
         self._is_trained = True
         self._trained_at = datetime.now(timezone.utc).isoformat(timespec="seconds")

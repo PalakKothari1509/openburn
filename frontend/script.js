@@ -351,19 +351,71 @@ function renderTrainOutput(data) {
   document.getElementById("result-train").hidden = false;
 }
 
+// Plain-language label per training stage, shown above the live detail
+// line (e.g. "Training A320 (6 of 20)") so a long run never looks like a
+// hung server — the status line always says what it's doing right now.
+const TRAIN_STAGE_LABELS = {
+  loading: "Reading files...",
+  cleaning: "Cleaning data...",
+  training: "Training aircraft models...",
+  validating: "Checking accuracy...",
+  done: "Finished",
+  error: "Failed",
+};
+
+function showTrainProgress(stage, detail) {
+  const box = document.getElementById("train-progress-box");
+  document.getElementById("train-progress-stage").textContent = TRAIN_STAGE_LABELS[stage] || "Working...";
+  document.getElementById("train-progress-detail").textContent = detail || "";
+  box.hidden = false;
+}
+function hideTrainProgress() {
+  document.getElementById("train-progress-box").hidden = true;
+}
+
+// Training runs in the background on the server; poll /train/status until
+// it finishes (or fails) instead of holding one long request open, so the
+// live stage/detail can update the whole time.
+function pollTrainStatus() {
+  return new Promise((resolve, reject) => {
+    const tick = async () => {
+      let status;
+      try {
+        status = await api("/train/status");
+      } catch (err) {
+        reject(err);
+        return;
+      }
+      showTrainProgress(status.stage, status.detail);
+      if (status.state === "done") {
+        hideTrainProgress();
+        resolve(status.result);
+      } else if (status.state === "error") {
+        hideTrainProgress();
+        reject(new Error(status.error || "Training failed"));
+      } else {
+        setTimeout(tick, 1000);
+      }
+    };
+    tick();
+  });
+}
+
 document.getElementById("form-train").addEventListener("submit", async (e) => {
   e.preventDefault();
   hideError();
   const fd = new FormData(e.target);
   const btn = e.target.querySelector("button");
-  setBusy(btn, "Training...", "Train from Path");
+  setBusy(btn, "Starting...", "Train from Path");
   try {
     const csvPaths = fd.get("csv_path").split(",").map((p) => p.trim()).filter(Boolean);
-    const data = await api("/train", {
+    await api("/train", {
       method: "POST",
       body: JSON.stringify({ csv_paths: csvPaths, replace: fd.get("replace") === "on" }),
     });
-    renderTrainOutput(data);
+    setBusy(btn, "Training...", "Train from Path");
+    const result = await pollTrainStatus();
+    renderTrainOutput(result);
     checkStatus();
     familiesLoaded = false;
   } catch (err) {
@@ -381,16 +433,43 @@ document.getElementById("form-train-upload").addEventListener("submit", async (e
   hideError();
   const fd = new FormData(e.target);
   const btn = e.target.querySelector("button");
-  setBusy(btn, "Uploading & Training...", "Upload & Train");
+  setBusy(btn, "Uploading...", "Upload & Train");
   try {
     // Don't use the api() helper here — it forces a JSON content-type,
     // which breaks multipart/form-data file uploads. Let fetch set its own.
     const res = await fetch(`${API_BASE}/train/upload`, { method: "POST", body: fd });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Unknown error");
-    renderTrainOutput(data);
+    setBusy(btn, "Training...", "Upload & Train");
+    const result = await pollTrainStatus();
+    renderTrainOutput(result);
     checkStatus();
     familiesLoaded = false;
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    clearBusy(btn);
+  }
+});
+
+// ============================================================
+// Clear all training data
+// ============================================================
+document.getElementById("btn-reset-training").addEventListener("click", async () => {
+  hideError();
+  if (!confirm("This deletes every uploaded training file and the trained model. This cannot be undone. Continue?")) {
+    return;
+  }
+  const btn = document.getElementById("btn-reset-training");
+  setBusy(btn, "Clearing...", "Clear all training data");
+  try {
+    await api("/train/reset", { method: "POST" });
+    document.getElementById("result-train").hidden = true;
+    document.getElementById("result-summary").hidden = true;
+    document.getElementById("result-families").hidden = true;
+    document.getElementById("result-scatter").hidden = true;
+    familiesLoaded = false;
+    checkStatus();
   } catch (err) {
     showError(err.message);
   } finally {

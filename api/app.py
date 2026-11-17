@@ -3,6 +3,8 @@
 import os
 import shutil
 import tempfile
+import threading
+from datetime import datetime, timezone
 from werkzeug.utils import secure_filename
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -51,6 +53,58 @@ emissions = EmissionsReport()
 
 if model.load_model(MODEL_PATH):
     print(f"Loaded saved model from {MODEL_PATH} — no need to retrain.")
+
+# Training runs in a background thread so the server can keep answering
+# /train/status while it works — otherwise a slow training run (many
+# aircraft types, lots of data) looks identical to a hung server, with no
+# way to tell what it's actually doing.
+_train_lock = threading.Lock()
+_train_status = {
+    "state": "idle",       # idle | running | done | error
+    "stage": None,         # loading | cleaning | training | validating | done | error
+    "detail": None,        # human-readable, e.g. "Training A320 (6 of 20)"
+    "started_at": None,
+    "finished_at": None,
+    "result": None,
+    "error": None,
+}
+
+
+def _run_training_job(paths: list[str], test_size: float) -> None:
+    def progress(stage: str, detail: str) -> None:
+        _train_status["stage"] = stage
+        _train_status["detail"] = detail
+
+    try:
+        result = model.train_from_csv(paths, test_size=test_size, progress_callback=progress)
+        model.save_model(MODEL_PATH)
+        _train_status.update(
+            state="done", stage="done", detail="Finished",
+            result=_clean_numpy(result), error=None,
+            finished_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        )
+    except Exception as e:
+        _train_status.update(
+            state="error", stage="error", detail=str(e), error=str(e),
+            finished_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        )
+    finally:
+        _train_lock.release()
+
+
+def _start_training_job(paths: list[str], test_size: float) -> bool:
+    """Returns False (without starting anything) if a training job is
+    already running."""
+    if not _train_lock.acquire(blocking=False):
+        return False
+    _train_status.update(
+        state="running", stage="loading", detail="Starting...",
+        result=None, error=None,
+        started_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        finished_at=None,
+    )
+    threading.Thread(target=_run_training_job, args=(paths, test_size), daemon=True).start()
+    return True
 
 
 # --- Frontend serving ---
@@ -127,12 +181,12 @@ def train():
                 dest = os.path.join(TRAINING_DATA_DIR, os.path.basename(p))
                 if os.path.abspath(dest) != os.path.abspath(p):
                     shutil.copy(p, dest)
-
-        result = model.train_from_csv(_accumulated_csv_paths(), test_size=test_size)
-        model.save_model(MODEL_PATH)
-        return jsonify({"status": "trained", **_clean_numpy(result)})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+    if not _start_training_job(_accumulated_csv_paths(), test_size):
+        return jsonify({"error": "A training run is already in progress — check /train/status"}), 409
+    return jsonify({"status": "started"}), 202
 
 
 @app.route("/train/upload", methods=["POST"])
@@ -162,12 +216,47 @@ def train_upload():
             _clear_training_history()
         for f in files:
             f.save(os.path.join(TRAINING_DATA_DIR, secure_filename(f.filename)))
-
-        result = model.train_from_csv(_accumulated_csv_paths(), test_size=test_size)
-        model.save_model(MODEL_PATH)
-        return jsonify({"status": "trained", **_clean_numpy(result)})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+    if not _start_training_job(_accumulated_csv_paths(), test_size):
+        return jsonify({"error": "A training run is already in progress — check /train/status"}), 409
+    return jsonify({"status": "started"}), 202
+
+
+@app.route("/train/status", methods=["GET"])
+def train_status():
+    """Poll this while a /train or /train/upload call is running, to see
+    which stage it's at (loading / cleaning / training <family> (i of N) /
+    validating) instead of just waiting on a response that may take a
+    while for a lot of data or aircraft types."""
+    return jsonify(_train_status)
+
+
+@app.route("/train/reset", methods=["POST"])
+def train_reset():
+    """Wipe all training data and the saved model, back to a fresh,
+    untrained state. Refuses while a training run is in progress."""
+    if _train_status["state"] == "running":
+        return jsonify({"error": "A training run is in progress — wait for it to finish first"}), 409
+
+    _clear_training_history()
+    if os.path.exists(MODEL_PATH):
+        os.remove(MODEL_PATH)
+
+    model.performance.reset()
+    model.fallback.reset()
+    model._duration_models = {}
+    model._is_trained = False
+    model._training_summary = {}
+    model._trained_at = None
+    model._trained_from = None
+
+    _train_status.update(
+        state="idle", stage=None, detail=None,
+        started_at=None, finished_at=None, result=None, error=None,
+    )
+    return jsonify({"status": "reset"})
 
 
 @app.route("/estimate", methods=["POST"])
@@ -354,4 +443,4 @@ def _float_or_none(val):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)

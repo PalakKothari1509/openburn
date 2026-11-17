@@ -206,7 +206,10 @@
         <!-- Train model -->
         <section class="card hidden" id="tab-train">
           <div class="ibox">
-            <div class="ibox-title"><h5>Train the Model</h5></div>
+            <div class="ibox-title ibox-title-row">
+              <h5>Train the Model</h5>
+              <button type="button" id="btn-reset-training" class="btn btn-link btn-danger-link">Clear all training data</button>
+            </div>
             <div class="ibox-content">
               <p class="ibox-lead">Upload past flights with actual fuel data to teach the model. Required before any estimate tab will work.</p>
 
@@ -234,6 +237,11 @@
                 </div>
                 <button type="submit" class="btn btn-primary">Train from Path</button>
               </form>
+
+              <div id="train-progress-box" class="alert alert-info" hidden>
+                <strong id="train-progress-stage">Working...</strong>
+                <div id="train-progress-detail" class="text-muted small"></div>
+              </div>
             </div>
           </div>
 

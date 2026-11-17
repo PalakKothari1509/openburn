@@ -7,7 +7,7 @@ profiles from historical fuel burn data grouped by aircraft family.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -38,7 +38,12 @@ class PerformanceModel:
     def __init__(self) -> None:
         self._profiles: dict[str, PerformanceProfile] = {}
 
-    def train(self, df: pd.DataFrame, aircraft_family_col: str = "aircraft_family") -> dict:
+    def train(
+        self,
+        df: pd.DataFrame,
+        aircraft_family_col: str = "aircraft_family",
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    ) -> dict:
         """Train fuel burn models per aircraft family.
 
         Args:
@@ -47,6 +52,11 @@ class PerformanceModel:
                 Optional columns: flight_duration_min, altitude_ft, speed_kts,
                     payload_kg, headwind_kts, temperature_c
             aircraft_family_col: Column containing aircraft family grouping.
+            progress_callback: Optional callback(index, total, family_name),
+                called before training each family — lets a caller (the API)
+                report "training X (3 of 20)" instead of an opaque wait, since
+                each family can take a while (cross-validation + permutation
+                importance on top of the fit itself).
 
         Returns:
             Dict of {family: PerformanceProfile} for all trained models.
@@ -59,7 +69,10 @@ class PerformanceModel:
         feature_cols = _select_feature_cols(df)
         results = {}
 
-        for family, group in df.groupby(aircraft_family_col):
+        groups = list(df.groupby(aircraft_family_col))
+        for i, (family, group) in enumerate(groups, start=1):
+            if progress_callback:
+                progress_callback(i, len(groups), str(family))
             if len(group) < 10:
                 continue  # Need minimum data to train
 
