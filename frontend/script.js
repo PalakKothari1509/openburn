@@ -685,12 +685,27 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
     // of a bare MAPE number, flight count, and the top factors driving its
     // fuel burn as readable tags instead of raw snake_case feature names.
     // Sorted so aircraft needing attention show up first.
-    document.getElementById("family-grid").innerHTML = Object.entries(families)
-      .map(([fam, info]) => {
-        const famStats = perFamily[fam];
-        const rating = accuracyRating(famStats ? famStats.mape_pct : null);
-        return { fam, info, famStats, rating };
-      })
+    const scored = Object.entries(families).map(([fam, info]) => {
+      const famStats = perFamily[fam];
+      const rating = accuracyRating(famStats ? famStats.mape_pct : null);
+      return { fam, info, famStats, rating };
+    });
+
+    // One-line takeaway above the cards, so the headline ("is this good?")
+    // doesn't require reading every card first.
+    const counts = { excellent: 0, good: 0, fair: 0, poor: 0, unknown: 0 };
+    scored.forEach(({ rating }) => { counts[rating.cls] = (counts[rating.cls] || 0) + 1; });
+    const solid = counts.excellent + counts.good;
+    const overview = document.getElementById("family-overview");
+    if (counts.poor + counts.fair === 0) {
+      overview.textContent = `All ${scored.length} aircraft types are performing well.`;
+    } else {
+      overview.textContent =
+        `${solid} of ${scored.length} aircraft types are performing well` +
+        (counts.poor > 0 ? `; ${counts.poor} need${counts.poor === 1 ? "s" : ""} more data.` : ".");
+    }
+
+    document.getElementById("family-grid").innerHTML = scored
       .sort((a, b) => {
         const severity = RATING_SEVERITY[a.rating.cls] - RATING_SEVERITY[b.rating.cls];
         if (severity !== 0) return severity;
@@ -699,9 +714,7 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
         return bMape - aMape || a.fam.localeCompare(b.fam);
       })
       .map(({ fam, info, famStats, rating }) => {
-        const errorText = famStats
-          ? `~${famStats.mape_pct}% typical error`
-          : `~${formatNum(info.rmse_kg)} kg typical error`;
+        const errorText = famStats ? `~${famStats.mape_pct}% error` : `~${formatNum(info.rmse_kg)} kg error`;
 
         const topFactors = Object.entries(info.feature_importance || {})
           .sort((a, b) => b[1] - a[1])
@@ -714,12 +727,9 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
             <span class="accuracy-card-title">${fam}</span>
             <span class="accuracy-badge ${rating.cls}">${rating.label}</span>
           </div>
-          <div class="accuracy-card-metrics">
-            <span>${formatNum(info.n_training_flights)} flights trained on</span>
-            <span>${errorText}</span>
-          </div>
+          <div class="accuracy-card-metrics">${formatNum(info.n_training_flights)} flights &middot; ${errorText}</div>
           <div class="accuracy-card-factors">
-            <span class="factor-label">What matters most for this aircraft:</span>
+            <span class="factor-label">Matters most:</span>
             <div class="factor-tags">${topFactors || '<span class="text-muted small">Not enough data yet</span>'}</div>
           </div>
         </div>`;

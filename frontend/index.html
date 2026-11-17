@@ -257,20 +257,16 @@
                   <span class="stat-label">Aircraft Types Trained</span>
                   <span class="stat-value" id="train-families">-</span>
                 </div>
-                <div class="stat-box" title="On average, how far off a fuel-burn guess usually is, as a percentage. Lower is better.">
-                  <span class="stat-label">Typical Error &#9432;</span>
+                <div class="stat-box">
+                  <span class="stat-label">Typical Error</span>
                   <span class="stat-value" id="train-mape">-</span>
                 </div>
-                <div class="stat-box" title="How well the model's guesses follow the real pattern of fuel burn across different flights. Closer to 100% is better.">
-                  <span class="stat-label">Consistency &#9432;</span>
+                <div class="stat-box">
+                  <span class="stat-label">Consistency</span>
                   <span class="stat-value" id="train-r2">-</span>
                 </div>
               </div>
-              <p class="text-muted small">
-                <strong>Typical Error</strong> — on average, how far off a guess usually is (lower is better).
-                <strong>Consistency</strong> — how well the guesses follow the real pattern across flights (closer to 100% is better).
-              </p>
-              <p class="text-muted small"><strong>Compared against real data:</strong> checked against the actual recorded fuel burn from Puck (the source system this data came from), on flights the model was not trained on.</p>
+              <p class="text-muted small">Lower error is better. Higher consistency is better. See the Model Accuracy tab for the full breakdown.</p>
               <details class="more">
                 <summary>Full raw response (for debugging)</summary>
                 <pre id="train-output"></pre>
@@ -284,12 +280,7 @@
           <div class="ibox">
             <div class="ibox-title"><h5>Model Accuracy</h5></div>
             <div class="ibox-content">
-              <p class="ibox-lead">A report card for the trained model — accuracy per aircraft type, and what drives each one's fuel burn.</p>
-              <p class="text-muted small" style="margin-top: -0.6rem; margin-bottom: 1rem;">
-                <strong>Compared against real data:</strong> every number below is OpenBurn's estimate checked
-                against the actual recorded fuel burn from Puck (the source system the training CSVs came
-                from), on real flights the model was not trained on.
-              </p>
+              <p class="ibox-lead">How accurate the model is right now, checked against Puck's real recorded fuel burn — not a guess about itself.</p>
               <button id="btn-load-families" class="btn btn-primary">Refresh</button>
 
               <div id="families-untrained" class="alert alert-info" hidden>
@@ -303,37 +294,45 @@
                     <span class="stat-label">Flights Trained On</span>
                     <span class="stat-value" id="sum-total">-</span>
                   </div>
-                  <div class="stat-box" title="On average, how far off a fuel-burn guess usually is, as a percentage. Lower is better.">
-                    <span class="stat-label">Typical Error &#9432;</span>
+                  <div class="stat-box">
+                    <span class="stat-label">Typical Error</span>
                     <span class="stat-value" id="sum-mape">-</span>
                   </div>
-                  <div class="stat-box" title="How well the model's guesses follow the real pattern of fuel burn across different flights. Closer to 100% is better.">
-                    <span class="stat-label">Consistency &#9432;</span>
+                  <div class="stat-box">
+                    <span class="stat-label">Consistency</span>
                     <span class="stat-value" id="sum-r2">-</span>
                   </div>
-                  <div class="stat-box" title="The same idea as Typical Error, but in kilograms instead of percent — so you can see the actual size of the mistake.">
-                    <span class="stat-label">Typical Error (kg) &#9432;</span>
+                  <div class="stat-box">
+                    <span class="stat-label">Typical Error (kg)</span>
                     <span class="stat-value" id="sum-rmse">-</span>
                   </div>
                 </div>
-                <p class="text-muted small">
-                  <strong>Typical Error</strong> — on average, how far off a fuel-burn guess usually is (lower is better).
-                  <strong>Consistency</strong> — how well the guesses follow the real pattern across flights (closer to 100% is better).
-                  <strong>Typical Error (kg)</strong> — the same error, shown in kilograms instead of percent.
-                </p>
+                <p class="text-muted small">Lower error is better. Higher consistency is better.</p>
+                <details class="more">
+                  <summary>What do these numbers mean?</summary>
+                  <p class="text-muted small">
+                    <strong>Typical Error</strong> — on average, how far off a fuel-burn guess usually is.
+                    <strong>Consistency</strong> — how well the guesses follow the real pattern across flights.
+                    <strong>Typical Error (kg)</strong> — the same error, shown in kilograms instead of percent.
+                    All three are checked against Puck's real recorded fuel burn, on flights the model never trained on.
+                  </p>
+                </details>
                 <p class="text-muted small">Last trained <span id="sum-trained-at">-</span> from <span id="sum-trained-from">-</span></p>
-                <div id="sum-source-breakdown"></div>
+                <details class="more">
+                  <summary>Which files contributed how much data</summary>
+                  <div id="sum-source-breakdown"></div>
+                </details>
               </div>
 
               <div id="result-families" hidden>
                 <div class="hr-line-dashed"></div>
+                <p id="family-overview" class="family-overview">-</p>
                 <div class="accuracy-legend">
                   <span class="accuracy-legend-item"><span class="accuracy-badge excellent">Excellent</span> ≤3% error</span>
                   <span class="accuracy-legend-item"><span class="accuracy-badge good">Good</span> ≤6%</span>
                   <span class="accuracy-legend-item"><span class="accuracy-badge fair">Fair</span> ≤10%</span>
                   <span class="accuracy-legend-item"><span class="accuracy-badge poor">Needs more data</span> &gt;10%</span>
                 </div>
-                <p class="text-muted small" style="margin-bottom: 0.8rem;">Broken down by aircraft type:</p>
                 <div class="accuracy-grid" id="family-grid"></div>
               </div>
 

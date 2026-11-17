@@ -365,6 +365,13 @@ table.table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 
 /* ---------- Model accuracy cards ---------- */
 
+.family-overview {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.9rem;
+}
+
 .accuracy-legend {
   display: flex;
   flex-wrap: wrap;
