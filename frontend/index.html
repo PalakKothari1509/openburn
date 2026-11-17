@@ -270,6 +270,7 @@
                 <strong>Typical Error</strong> — on average, how far off a guess usually is (lower is better).
                 <strong>Consistency</strong> — how well the guesses follow the real pattern across flights (closer to 100% is better).
               </p>
+              <p class="text-muted small"><strong>Compared against real data:</strong> checked against the actual recorded fuel burn from Puck (the source system this data came from), on flights the model was not trained on.</p>
               <details class="more">
                 <summary>Full raw response (for debugging)</summary>
                 <pre id="train-output"></pre>
@@ -284,6 +285,11 @@
             <div class="ibox-title"><h5>Model Accuracy</h5></div>
             <div class="ibox-content">
               <p class="ibox-lead">A report card for the trained model — accuracy per aircraft type, and what drives each one's fuel burn.</p>
+              <p class="text-muted small" style="margin-top: -0.6rem; margin-bottom: 1rem;">
+                <strong>Compared against real data:</strong> every number below is OpenBurn's estimate checked
+                against the actual recorded fuel burn from Puck (the source system the training CSVs came
+                from), on real flights the model was not trained on.
+              </p>
               <button id="btn-load-families" class="btn btn-primary">Refresh</button>
 
               <div id="families-untrained" class="alert alert-info" hidden>
