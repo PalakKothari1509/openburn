@@ -67,7 +67,7 @@ openburn/
 │   ├── script.js                # Frontend logic (API calls, rendering)
 │   └── Dockerfile
 ├── data/
-│   ├── airport_coords.csv       # 5,459 IATA airports with lat/lon
+│   ├── airport_coords.csv       # ~19,800 airports (IATA + ICAO codes) with lat/lon
 │   ├── sample_aircraft_types.csv
 │   ├── sample_fuel_data.csv
 │   └── training_history/        # accumulated CSVs from /train (gitignored)
@@ -203,9 +203,13 @@ For each aircraft family, it removes flights where fuel-per-km is more than
 a typo making fuel 10x too high).
 
 **Airport Coordinates** (lines 17-39):
-`_AIRPORT_COORDS` is a global dictionary `{IATA_code: (lat, lon)}` loaded
-from `data/airport_coords.csv`. The `_haversine()` function computes the
-straight-line distance between two lat/lon points on Earth's surface.
+`_AIRPORT_COORDS` is a global dictionary `{code: (lat, lon)}` loaded from
+`data/airport_coords.csv`, keyed by **both IATA (3-letter, e.g. `AMS`) and
+ICAO (4-letter, e.g. `EHAM`) codes** for the same airport — different
+airlines' exports use either, and a route whose airport isn't in this
+table resolves to a missing distance and gets dropped during training.
+The `_haversine()` function computes the straight-line distance between
+two lat/lon points on Earth's surface.
 
 ---
 
