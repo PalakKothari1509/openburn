@@ -2,6 +2,7 @@
 
 import os
 import shutil
+import tempfile
 from werkzeug.utils import secure_filename
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -106,9 +107,26 @@ def train():
     test_size = float(data.get("test_size", 0.2))
     try:
         if data.get("replace"):
-            _clear_training_history()
-        for p in csv_paths:
-            shutil.copy(p, os.path.join(TRAINING_DATA_DIR, os.path.basename(p)))
+            # Stage copies of the new file(s) OUTSIDE the training-history
+            # folder first, THEN clear old history, THEN move the staged
+            # copies in. Clearing first (the old order) could delete a
+            # source file before it was copied, if that path already lived
+            # inside the training-history folder (e.g. retraining on a
+            # previously-uploaded file) — losing it with nothing to replace it.
+            with tempfile.TemporaryDirectory() as staging:
+                staged = []
+                for p in csv_paths:
+                    dest = os.path.join(staging, os.path.basename(p))
+                    shutil.copy(p, dest)
+                    staged.append(dest)
+                _clear_training_history()
+                for sp in staged:
+                    shutil.copy(sp, os.path.join(TRAINING_DATA_DIR, os.path.basename(sp)))
+        else:
+            for p in csv_paths:
+                dest = os.path.join(TRAINING_DATA_DIR, os.path.basename(p))
+                if os.path.abspath(dest) != os.path.abspath(p):
+                    shutil.copy(p, dest)
 
         result = model.train_from_csv(_accumulated_csv_paths(), test_size=test_size)
         model.save_model(MODEL_PATH)
