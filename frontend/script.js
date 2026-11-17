@@ -30,6 +30,35 @@ function formatTrainedFrom(names) {
   return { text: `${arr.length} training files`, title: arr.join(", ") };
 }
 
+// Shows how many rows each training file actually contributed after
+// cleaning, so a file that's silently mostly dropped (bad encoding, wrong
+// columns, a truncated upload, ...) is visible instead of just looking
+// like a smaller-than-expected "Flights Trained On" total.
+function renderSourceBreakdown(breakdown) {
+  const container = document.getElementById("sum-source-breakdown");
+  container.innerHTML = "";
+  if (!breakdown || breakdown.length < 2) return; // not useful for a single file
+
+  const heading = document.createElement("p");
+  heading.className = "text-muted small";
+  heading.style.marginTop = "0.5rem";
+  heading.style.marginBottom = "0.2rem";
+  const strong = document.createElement("strong");
+  strong.textContent = "Per-file breakdown:";
+  heading.appendChild(strong);
+  container.appendChild(heading);
+
+  const list = document.createElement("ul");
+  list.className = "source-breakdown-list";
+  breakdown.forEach((b) => {
+    const li = document.createElement("li");
+    const pct = b.raw_rows > 0 ? Math.round((b.rows_used / b.raw_rows) * 100) : 0;
+    li.textContent = `${b.file} — ${formatNum(b.rows_used)} of ${formatNum(b.raw_rows)} rows used (${pct}%)`;
+    list.appendChild(li);
+  });
+  container.appendChild(list);
+}
+
 // Toggle a submit button into/out of a "working" state so slow requests
 // (and accidental double-submits) give visible feedback.
 function setBusy(btn, busyText, idleText) {
@@ -570,6 +599,7 @@ document.getElementById("btn-load-families").addEventListener("click", async () 
     document.getElementById("sum-mape").textContent = overall ? `${overall.mape_pct}%` : "N/A";
     document.getElementById("sum-r2").textContent = overall ? `${(overall.r_squared * 100).toFixed(1)}%` : "N/A";
     document.getElementById("sum-rmse").textContent = overall ? `${formatNum(overall.rmse_kg)} kg` : "N/A";
+    renderSourceBreakdown(summary.source_breakdown);
     document.getElementById("result-summary").hidden = false;
 
     // One card per aircraft type: a plain-language accuracy rating instead

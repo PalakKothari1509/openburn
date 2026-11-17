@@ -83,9 +83,30 @@ class FuelBurnModel:
         """
         paths = [fuel_csv_path] if isinstance(fuel_csv_path, (str, Path)) else list(fuel_csv_path)
 
-        frames = [self.features.load_fuel_csv(str(p), **kwargs) for p in paths]
+        # Tag each row with its source file before combining, so we can
+        # report how many rows each file actually contributed after
+        # cleaning — otherwise a file that's silently mostly dropped (bad
+        # encoding, wrong columns, a truncated upload, ...) is invisible,
+        # and a lower-than-expected total looks identical to "working as
+        # intended" from the outside.
+        raw_counts: dict[str, int] = {}
+        frames = []
+        for p in paths:
+            frame = self.features.load_fuel_csv(str(p), **kwargs)
+            name = Path(p).name
+            frame["_source_file"] = name
+            raw_counts[name] = raw_counts.get(name, 0) + len(frame)
+            frames.append(frame)
         df = pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
         df = self.features.prepare_training_data(df)
+
+        cleaned_counts = df["_source_file"].value_counts().to_dict() if "_source_file" in df.columns else {}
+        source_breakdown = [
+            {"file": name, "raw_rows": raw_counts[name], "rows_used": int(cleaned_counts.get(name, 0))}
+            for name in raw_counts
+        ]
+        if "_source_file" in df.columns:
+            df = df.drop(columns=["_source_file"])
 
         # Start from a clean slate — otherwise aircraft families from a
         # previous, unrelated training run could silently stick around
@@ -122,6 +143,7 @@ class FuelBurnModel:
             "total_flights": len(df),
             "training_flights": len(train_df),
             "test_flights": len(test_df) if test_df is not None else 0,
+            "source_breakdown": source_breakdown,
             "per_family": {
                 name: {
                     "rmse_cv_kg": p.rmse_cv,
