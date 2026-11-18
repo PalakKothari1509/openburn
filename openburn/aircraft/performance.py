@@ -12,8 +12,15 @@ from typing import Callable, Optional
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, KFold
 from sklearn.inspection import permutation_importance
+
+# Features that aren't recorded by every airline/file (e.g. fp_trip_fuel,
+# the airline's own flight-planned fuel figure) — kept as a feature only
+# for families that have at least some coverage, and allowed to be NaN
+# per-row elsewhere; HistGradientBoostingRegressor handles missing values
+# in a column natively, so this needs no imputation.
+OPTIONAL_FEATURES = {"fp_trip_fuel"}
 
 
 @dataclass
@@ -76,11 +83,24 @@ class PerformanceModel:
             if len(group) < 10:
                 continue  # Need minimum data to train
 
-            X = group[feature_cols].copy()
+            # Optional features (e.g. fp_trip_fuel) aren't recorded by every
+            # airline/file, so a family with zero coverage for one would
+            # otherwise crash HistGradientBoostingRegressor's binning step
+            # on an all-missing column. Drop it for this family only; keep
+            # it for families that do have it, since HGB handles per-row
+            # NaNs in a kept column natively (no imputation needed).
+            family_feature_cols = [
+                c for c in feature_cols
+                if c not in OPTIONAL_FEATURES or group[c].notna().any()
+            ]
+            required_cols = [c for c in family_feature_cols if c not in OPTIONAL_FEATURES]
+
+            X = group[family_feature_cols].copy()
             y = group["fuel_burn_kg"].copy()
 
-            # Drop rows with NaN in features or target
-            valid = X.notna().all(axis=1) & y.notna()
+            # Drop rows missing a required feature or the target; optional
+            # features may be NaN per-row.
+            valid = X[required_cols].notna().all(axis=1) & y.notna()
             X = X[valid]
             y = y[valid]
 
@@ -94,9 +114,14 @@ class PerformanceModel:
                 random_state=42,
             )
 
-            # Cross-validated RMSE
+            # Cross-validated RMSE. Shuffled folds matter here: rows are
+            # concatenated file-by-file before grouping, so an unshuffled
+            # split could hand an optional feature's fold all-NaN if, say,
+            # one source file never recorded it and happens to sort into
+            # its own fold.
+            cv = KFold(n_splits=min(5, len(X)), shuffle=True, random_state=42)
             scores = cross_val_score(
-                model, X, y, cv=min(5, len(X)), scoring="neg_root_mean_squared_error"
+                model, X, y, cv=cv, scoring="neg_root_mean_squared_error"
             )
             rmse = -scores.mean()
 
@@ -109,12 +134,12 @@ class PerformanceModel:
                 model, X, y, n_repeats=5, random_state=42,
                 scoring="neg_root_mean_squared_error",
             )
-            importance = dict(zip(feature_cols, [round(float(v), 4) for v in perm.importances_mean]))
+            importance = dict(zip(family_feature_cols, [round(float(v), 4) for v in perm.importances_mean]))
 
             profile = PerformanceProfile(
                 aircraft_family=str(family),
                 model=model,
-                feature_names=feature_cols,
+                feature_names=family_feature_cols,
                 rmse_cv=round(rmse, 2),
                 n_training_flights=len(X),
                 feature_importance=importance,
@@ -201,5 +226,6 @@ def _select_feature_cols(df: pd.DataFrame) -> list[str]:
         "takeoff_weight_kg",
         "passengers",
         "cargo_kg",
+        "fp_trip_fuel",
     ]
     return [c for c in potential_features if c in df.columns]

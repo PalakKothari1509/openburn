@@ -262,6 +262,16 @@ The model uses whatever features are available in the training data:
 | `headwind_kts` | Wind component |
 | `temperature_c` | Outside air temperature |
 | `takeoff_weight_kg` | Gross takeoff weight |
+| `fp_trip_fuel` | The airline's own flight-planned fuel figure, when the file records it (optional — see below) |
+
+`fp_trip_fuel` is optional: some airlines/files record it, others don't.
+A family only gets it as a feature if at least some of its flights have a
+value; rows within that family that still lack it are left as NaN —
+`HistGradientBoostingRegressor` handles missing values per-row natively,
+so this needs no imputation. Where available, it's an unusually strong
+signal (it already bakes in the airline's own weight/route/weather
+planning), and testing against real holdout data showed it meaningfully
+reduces error for aircraft types that have it.
 
 ### Training Process (lines 39-101)
 
